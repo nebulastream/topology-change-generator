@@ -18,7 +18,6 @@ fn main() -> Result<()> {
     let start_time = gtfs::parse_duration("08:00:00").unwrap();
     let end_time = gtfs::parse_duration("08:03:00").unwrap();
     let day = "monday";
-    let speedUp = 10;
     let batchIntervalSizeInSeconds = 1;
     let changeFrequencyInSeconds = 1;
     
@@ -29,10 +28,13 @@ fn main() -> Result<()> {
     
     //cell id params
     let file_path  = "OpenCelliDGermanyData.csv";
-    let vodafone_mncs = vec![2, 4, 9];
+    let networkIdentifier = vec![2, 4, 9]; // For vodafone
     let beginning_of_2024 = 1704067200;
     let min_samples = 10;
     let radio = "LTE";
+
+    // NebulaStream related config
+    let start_node_id = 2;
 
     // get any trip id from the line S3 and print all the stop names in order of the trip
 
@@ -99,7 +101,7 @@ fn main() -> Result<()> {
     
     //tddo: use or remove coordinates as arguments
     println!("partial trips: {}", partial_trips.len());
-    let cells = cell_data::get_closest_cells_from_csv(file_path, radio, 262, &vodafone_mncs, 0.0, 0.0, 0, beginning_of_2024, min_samples, partial_trips);
+    let cells = cell_data::get_closest_cells_from_csv(file_path, radio, 262, &networkIdentifier, 0.0, 0.0, 0, beginning_of_2024, min_samples, partial_trips);
     println!("cell towers {}", cells.radio_cells.len());
     // let gj = gtfs::to_geojson(partial_trips);
     let gj = cells.to_geojson();
