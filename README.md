@@ -1,4 +1,4 @@
-# ISQP-TopologyChangeGenerator
+# TopologyChangeGenerator
 This repository contains code to produce a collection of topology changes based on [OpenCelliD](https://opencellid.org/) database and GTFS schedule of [VBB](https://www.vbb.de/vbb-services/api-open-data/datensaetze/). This generator is used for investigating the effect of mobile infrastructure on the runtime perfromance of NebulaStream. We have a publication under submission. In the future, we will add the link to the accepted version of the paper. 
 
 # Pre-Processing Steps
