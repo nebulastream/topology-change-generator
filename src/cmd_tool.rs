@@ -18,8 +18,8 @@ fn main() -> Result<()> {
     let start_time = gtfs::parse_duration("08:00:00").unwrap();
     let end_time = gtfs::parse_duration("08:03:00").unwrap();
     let day = "monday";
-    let batchIntervalSizeInSeconds = 1;
-    let changeFrequencyInSeconds = 1;
+    let batchIntervalSizeInSeconds = 20;
+    let changeFrequencyInSeconds = 4;
     
     //output paths
     let topology_path = "fixed_topology.json";
@@ -114,7 +114,11 @@ fn main() -> Result<()> {
     let (topology, cell_id_to_node_id) = create_single_fog_layer_topology_from_cell_data(2, default_resources, &cells);
     topology.write_to_file(topology_path).unwrap();
 
-    let simulated_reconnects = nes_simulation::SimulatedReconnects::from_topology_and_cell_data(topology, cells, cell_id_to_node_id, start_time);
+    let batch_interval = std::time::Duration::from_secs(batchIntervalSizeInSeconds);
+    let batch_gap = std::time::Duration::from_secs(changeFrequencyInSeconds);
+    let simulated_reconnects = nes_simulation::SimulatedReconnects::from_topology_and_cell_data(topology, cells, cell_id_to_node_id, start_time, batch_interval.into(), batch_gap.into());
+    // let simulated_reconnects = nes_simulation::SimulatedReconnects::from_topology_and_cell_data(topology, cells, cell_id_to_node_id, start_time, None, None);
+    println!("topology updates: {}", simulated_reconnects.topology_updates.len());
     let json_string = serde_json::to_string_pretty(&simulated_reconnects).unwrap();
     std::fs::write(topology_updates_path, json_string).unwrap();
 

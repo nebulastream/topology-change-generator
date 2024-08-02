@@ -8,7 +8,7 @@ use crate::colors;
 
 #[derive(Clone, Debug)]
 pub struct PartialTrip {
-    trip_id: String,
+    pub trip_id: String,
     pub stops: Vec<Stop>,
     pub shape_points: Vec<ShapePoint>,
 }
