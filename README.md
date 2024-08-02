@@ -1,6 +1,14 @@
 # TopologyChangeGenerator
 This repository contains code to produce a collection of topology changes based on [OpenCelliD](https://opencellid.org/) database and GTFS schedule of [VBB](https://www.vbb.de/vbb-services/api-open-data/datensaetze/). This generator is used for investigating the effect of mobile infrastructure on the runtime perfromance of NebulaStream. We have a publication under submission. In the future, we will add the link to the accepted version of the paper. 
 
+# About
+
+This tool allows the user to generate a collection of topology change events that can be consumed by NebulaStream. To this end, the user has to select an OpenCelliD dataset for a predefined geograpical area and a public transport schedule infromation provided by Gtfs file. The user then selects a predefined time interval for which the schedule needs to be picked. 
+This information is used to (1) the number buses/trams/trains/subways represented as mobile devices, (2) identify the bus/train/tram/subway lines that the mobile devices operate on, and (3) the number of trips the mobile devies perfroms during the selected schedule time frame. Next, user selects the cell towers that need to be considered for computing the fixed base stations to which the mobile devices disconnect and reconnect when they move around the geographical area while performing the trips. 
+The user can also define speedups using "batchIntervalSizeInSeconds" ([see](#parameters-for-schedule-selection)) setting to condense a large schedule time into a very small interval to generate large number of topology change events per second. This approach is similar to the one used by Huan et al. in [Efficient and Error-bounded Spatiotemporal Quantile Monitoring in Edge Computing
+Environments](https://vbn.aau.dk/ws/portalfiles/portal/515412211/p1753_li.pdf).
+
+
 # Pre-Processing Steps
 
 1. Download the GTFS schedule from VBB link provided above. The schedule information is used for finding the trajectory of mobile devices.
@@ -13,7 +21,6 @@ This repository contains code to produce a collection of topology changes based 
    bin/gtfsdb-load --database_url sqlite:///vbb_gtfs.db <location of gtfs file>/GTFS.zip
 ```   
 3. Install Rust toolchain (`curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh` for ubuntu 22.04 LTS).
-
 
 # Execution
 
