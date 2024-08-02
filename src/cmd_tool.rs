@@ -11,13 +11,16 @@ fn main() -> Result<()> {
     //todo: take command line args
     
     //db
-    let path = "gtfs_vbb.db";
-    let db = Connection::open(path)?;
+    let dbPath = "gtfs_vbb.db";
+    let db = Connection::open(dbPath)?;
     
     //time window
     let start_time = gtfs::parse_duration("08:00:00").unwrap();
     let end_time = gtfs::parse_duration("08:03:00").unwrap();
     let day = "monday";
+    let speedUp = 10;
+    let batchIntervalSizeInSeconds = 1;
+    let changeFrequencyInSeconds = 1;
     
     //output paths
     let topology_path = "fixed_topology.json";
