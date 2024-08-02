@@ -28,7 +28,7 @@ fn main() -> Result<()> {
     let geo_json_path = "geo.json";
     
     //cell id params
-    let file_path  = "262.csv";
+    let file_path  = "OpenCelliDGermanyData.csv";
     let vodafone_mncs = vec![2, 4, 9];
     let beginning_of_2024 = 1704067200;
     let min_samples = 10;
