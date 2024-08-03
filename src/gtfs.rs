@@ -215,21 +215,7 @@ pub fn parse_duration(time_str: &str) -> rusqlite::Result<Duration, Box<dyn std:
 
 //read the stops for a trip
 pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duration, end_time: Duration) -> rusqlite::Result<Option<PartialTrip>, Box<dyn std::error::Error>> {
-    let mut stmt = db.prepare("SELECT count(*) FROM stop_times LEFT JOIN stops ON stops.stop_id=stop_times.stop_id WHERE trip_id=:trip_id AND stops.stop_name IN ('S Bellevue (Berlin)', 'S Charlottenburg Bhf (Berlin)', 'S Hackescher Markt (Berlin)',  'S Ostbahnhof (Berlin)', 'S Ostkreuz Bhf (Berlin)', 'S Savignyplatz (Berlin)',  'S Tiergarten (Berlin)', 'S Westkreuz (Berlin)', 'S+U Alexanderplatz Bhf (Berlin)', 'S+U Berlin Hauptbahnhof', 'S+U Friedrichstr. Bhf (Berlin)', 'S+U Jannowitzbrücke (Berlin)', 'S+U Warschauer Str. (Berlin)', 'S+U Zoologischer Garten Bhf (Berlin)'
-)")?;
-    let count = stmt.query_map(named_params! {":trip_id": trip_id}, |row| {
-        Ok(row.get::<usize, i64>(0))
-    })?;
-    for c in count {
-        let c = c.unwrap().unwrap();
-        //todo: hard coded value
-        if c != 14 {
-            return Ok(None);
-        }
-    }
-
-    let mut stmt = db.prepare("SELECT stops.stop_id, arrival_time, departure_time, stop_name FROM stop_times LEFT JOIN stops ON stops.stop_id=stop_times.stop_id WHERE trip_id=:trip_id AND stops.stop_name IN ('S Bellevue (Berlin)', 'S Charlottenburg Bhf (Berlin)', 'S Hackescher Markt (Berlin)',  'S Ostbahnhof (Berlin)', 'S Ostkreuz Bhf (Berlin)', 'S Savignyplatz (Berlin)',  'S Tiergarten (Berlin)', 'S Westkreuz (Berlin)', 'S+U Alexanderplatz Bhf (Berlin)', 'S+U Berlin Hauptbahnhof', 'S+U Friedrichstr. Bhf (Berlin)', 'S+U Jannowitzbrücke (Berlin)', 'S+U Warschauer Str. (Berlin)', 'S+U Zoologischer Garten Bhf (Berlin)'
-)")?;
+    let mut stmt = db.prepare("SELECT stops.stop_id, arrival_time, departure_time, stop_name FROM stop_times LEFT JOIN stops ON stops.stop_id=stop_times.stop_id WHERE trip_id=:trip_id ")?;
 
     let stop_times = stmt.query_map(named_params! {":trip_id": trip_id}, |row| {
         Ok((row.get::<usize, String>(0), row.get::<usize, String>(1), row.get::<usize, String>(2), row.get::<usize, String>(3)))

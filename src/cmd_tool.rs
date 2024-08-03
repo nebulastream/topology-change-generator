@@ -46,9 +46,9 @@ fn main() -> Result<()> {
 
 
     // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41', 'S42')")?;
-    // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41', 'S42')")?;
+    let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41')")?;
     // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S3')")?;
-    let mut stmt = db.prepare("SELECT route_id FROM routes")?;
+    // let mut stmt = db.prepare("SELECT route_id FROM routes")?;
     let route_ids = stmt.query_map(params![], |row| {
         Ok(row.get::<usize, String>(0))
     })?;
@@ -69,22 +69,6 @@ fn main() -> Result<()> {
 
             //read stops and print geojson
             let (route_id, trip_id, service_id) = trip.unwrap();
-
-            //check if the trip is active on the given day
-            let mut stmt = db.prepare("SELECT monday FROM calendar WHERE service_id=:service_id")?;
-            let service_id = service_id?;
-            let mut active = stmt.query_map(named_params!{":service_id": &service_id/*, ":day": day*/}, |row| {
-                Ok(row.get::<usize, i32>(0))
-            })?;
-
-            let active = active.next().unwrap().unwrap();
-            let active = active?;
-            println!("active: {}", active);
-
-            if active != 1 {
-                println!("skipping trip {} with service id {} because it is not active on {}", trip_id?, service_id, day);
-                continue;
-            }
 
             if let Some(trip) = gtfs::read_stops_for_trip(trip_id.unwrap(), &db, start_time, end_time).unwrap() {
                 // let gj = trip.to_geojson();
