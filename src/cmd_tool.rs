@@ -46,8 +46,8 @@ fn main() -> Result<()> {
 
 
     // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41', 'S42')")?;
-    let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41')")?;
-    // let mut stmt = db.prepare("SELECT DISTINCT block_id FROM routes, trips, calendar_dates WHERE trips.route_id=routes.route_id AND trips.service_id=calendar_dates.service_id and routes.route_short_name in ('S41') and calendar_dates.date='2024-07-29'")?;
+    // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41')")?;
+    let mut stmt = db.prepare("SELECT DISTINCT block_id FROM routes, trips, calendar_dates WHERE trips.route_id=routes.route_id AND trips.service_id=calendar_dates.service_id and routes.route_short_name in ('S41') and calendar_dates.date='2024-07-29'")?;
     // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S3')")?;
     // let mut stmt = db.prepare("SELECT route_id FROM routes")?;
     let block_ids = stmt.query_map(params![], |row| {
@@ -57,26 +57,26 @@ fn main() -> Result<()> {
     let mut partial_trips = Vec::new();
     // let mut all_shape_points = HashSet::new();
     for block_id in block_ids {
-        let id = block_id.unwrap().unwrap();
+        // let id = block_id.unwrap().unwrap();
+        //
+        // //retrieve trips
+        // let mut stmt = db.prepare("SELECT route_id, trip_id, service_id FROM trips WHERE route_id=:route_id")?;
+        // let trips = stmt.query_map(named_params! {":route_id": id}, |row| {
+        //     Ok((row.get::<usize, String>(0), row.get::<usize, String>(1), row.get::<usize, String>(2)))
+        // })?;
+        //
+        // for trip in trips {
+        //
+        //
+        //     //read stops and print geojson
+        //     let (route_id, trip_id, service_id) = trip.unwrap();
 
-        //retrieve trips
-        let mut stmt = db.prepare("SELECT route_id, trip_id, service_id FROM trips WHERE route_id=:route_id")?;
-        let trips = stmt.query_map(named_params! {":route_id": id}, |row| {
-            Ok((row.get::<usize, String>(0), row.get::<usize, String>(1), row.get::<usize, String>(2)))
-        })?;
-
-        for trip in trips {
-
-
-            //read stops and print geojson
-            let (route_id, trip_id, service_id) = trip.unwrap();
-
-            if let Some(trip) = gtfs::read_stops_for_trip(trip_id.unwrap(), &db, start_time, end_time).unwrap() {
+            if let Some(trip) = gtfs::read_stops_for_trip(block_id.unwrap().unwrap(), &db, start_time, end_time).unwrap() {
                 partial_trips.push(trip);
             }
 
 
-        }
+        // }
     }
     //todo: move the piecing together logic to a separate lib file
     
