@@ -79,7 +79,7 @@ impl SimulatedReconnects {
 
             let cell_id = trip.cell_data.get(&(shape_id, sequence_nr)).unwrap();
             let mut parent_id = *cell_id_to_node_id.get(cell_id).unwrap();
-            initial_parents.push((child_id, parent_id));
+            initial_parents.push((parent_id, child_id));
             let mut previous_parent_id = parent_id;
             for point in &trip.trip.shape_points[1..] {
                 let shape_id = point.shape_id.clone();
