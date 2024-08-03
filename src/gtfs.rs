@@ -300,44 +300,6 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
     }
 
     // iterate over the stops in the range and try to find a matching shape point
-    // for stop in &stops_in_range {
-    //iterator over all stops and find the closest shape points, shape points will then be sorted out by time afterwards
-    let mut stmt = db.prepare("SELECT stops.stop_id, arrival_time, departure_time, stop_name FROM stop_times LEFT JOIN stops ON stops.stop_id=stop_times.stop_id WHERE trip_id=:trip_id")?;
-
-    // let all_stop_times = stmt.query_map(named_params! {":trip_id": trip_id}, |row| {
-    //     Ok((row.get::<usize, String>(0), row.get::<usize, String>(1), row.get::<usize, String>(2), row.get::<usize, String>(3)))
-    // })?;
-    // let mut all_stops = BTreeMap::new();
-    // for stop_time in all_stop_times {
-    //     let (stop_id, arrival_time, departure_time, stop_name) = stop_time.unwrap();
-    //     let stop_id = stop_id.unwrap();
-    //     let arrival_time = arrival_time.unwrap();
-    //     let departure_time = departure_time.unwrap();
-    //     let arrival_time = parse_duration(&arrival_time)?;
-    //     let departure_time = parse_duration(&departure_time)?;
-    //     let stop_name = stop_name.unwrap();
-    //     // if arrival_time < start_time || departure_time > end_time {
-    //     //     continue;
-    //     // }
-    //     let mut stmt = db.prepare("SELECT stop_lat, stop_lon FROM stops WHERE stop_id=:stop_id")?;
-    //     let stop_coords = stmt.query_map(named_params! {":stop_id": stop_id}, |row| {
-    //         Ok((row.get::<usize, f64>(0), row.get::<usize, f64>(1)))
-    //     })?;
-    //     for stop_coord in stop_coords {
-    //         let ( lat, lon) = stop_coord.unwrap();
-    //         let lat = lat.unwrap();
-    //         let lon = lon.unwrap();
-    //         all_stops.insert(arrival_time, Stop {
-    //             trip_id: trip_id.clone(),
-    //             stop_id: stop_id.clone(),
-    //             arrival_time: duration_to_string(arrival_time),
-    //             departure_time: duration_to_string(departure_time),
-    //             lat,
-    //             lon,
-    //             stop_name: stop_name.clone(),
-    //         });
-    //     }
-    // }
     for (_, stop) in &stops {
         // println!("checking stop {}, arrival time", stop.stop_name);
         let mut closest_shape_point_sequence = None;
@@ -362,6 +324,7 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
 
     //iterate over shape points and interpolate times
     let mut last_time_index = None;
+
     for (i, shape_point) in shape_points.clone().iter().enumerate() {
         //when a shape point with a time is found, start counting the points until the next time
         if let Some(time) = shape_point.time {
@@ -369,7 +332,13 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
                 let last_time_elem: &ShapePoint = &shape_points[last_time_index];
                 let last_time = last_time_elem.time.unwrap();
                 let next_time = time;
-                let time_diff = next_time - last_time;
+                // let time_diff = next_time - last_time;
+                let time_diff = if let Some(time_diff) = next_time.checked_sub(last_time) {
+                   time_diff
+                } else {
+                    //end of circular line
+                   continue
+                };
                 assert!(time_diff > Duration::from_secs(0));
                 // let time_diff = next_time.checked_sub(last_time).unwrap();
                 let num_points = i - last_time_index;

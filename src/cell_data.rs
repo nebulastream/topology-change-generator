@@ -240,7 +240,8 @@ fn find_closest_tower_from_map(id_to_cell: &mut HashMap<(u64, u64), RadioCell>, 
         let distance = geo_utils::vincenty_dist_between_coordinates((closest.lat, closest.lon), (point.shape_pt_lat, point.shape_pt_lon));
         if distance > closest.range {
             //todo: do not panic but handle gracefully
-            panic!("closest tower at distance {} but range is {}", distance, closest.range);
+            // panic!("closest tower at distance {} but range is {}", distance, closest.range);
+            println!("closest tower at distance {} but range is {}", distance, closest.range);
         }
     }
 
