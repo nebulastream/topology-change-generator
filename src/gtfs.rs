@@ -87,6 +87,8 @@ fn feature_line_from_shape_points(shape_points: &Vec<ShapePoint>) -> Feature {
         panic!("No shape points found for trip");
     }
     let mut coordinates = Vec::new();
+    let mut shape_points = shape_points.clone();
+    shape_points.sort_by_key(|x| x.time.unwrap());
     for shape_point in shape_points {
         //print the time
         if let Some(time) = shape_point.time {
@@ -217,6 +219,7 @@ pub fn parse_duration(time_str: &str) -> rusqlite::Result<Duration, Box<dyn std:
 //read the stops for a trip
 pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Duration, end_time: Duration) -> rusqlite::Result<Option<PartialTrip>, Box<dyn std::error::Error>> {
     println!("reading stops for trip {}", block_id);
+    let mut stmt = db.prepare("SELECT trip_id FROM stop_times LEFT JOIN stops ON stops.stop_id=stop_times.stop_id WHERE trip_id=:trip_id ")?;
     let mut stmt = db.prepare("SELECT stops.stop_id, arrival_time, departure_time, stop_name FROM stop_times LEFT JOIN stops ON stops.stop_id=stop_times.stop_id WHERE trip_id=:trip_id ")?;
 
     let stop_times = stmt.query_map(named_params! {":trip_id": block_id}, |row| {
@@ -353,18 +356,17 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
         if let Some(time) = shape_point.time {
             if let Some(last_time_index) = last_time_index {
                 let last_time_elem: &ShapePoint = &shape_points[last_time_index];
-                let last_time = last_time_elem.time.unwrap();
+                let mut last_time = last_time_elem.time.unwrap();
                 let next_time = time;
-                // let time_diff = next_time - last_time;
                 let time_diff = if let Some(time_diff) = next_time.checked_sub(last_time) {
                    time_diff
                 } else {
                     let (first_time, sec_time): (Duration, Duration) = circular_end_time_tuple.expect("No circular end time");
                     assert_eq!(sec_time, last_time);
-                    first_time
+                    last_time = first_time;
+                    next_time.checked_sub(last_time).unwrap()
                 };
                 assert!(time_diff > Duration::from_secs(0));
-                // let time_diff = next_time.checked_sub(last_time).unwrap();
                 let num_points = i - last_time_index;
                 let time_diff_per_point = time_diff / num_points as u32;
                 for j in last_time_index + 1..i {
@@ -375,6 +377,25 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
             last_time_index = Some(i);
         }
     }
+
+    //wrap around
+    if let Some((first_time, sec_time)) = circular_end_time_tuple {
+        //get the last stop
+        let last_stop = stops_in_range.last().unwrap();
+        let stop_center_time = (parse_duration(&stop.arrival_time).unwrap().as_millis() + parse_duration(&stop.departure_time).unwrap().as_millis()) / 2;
+        //get the first stop
+        let first_stop = stops_in_range.first().unwrap();
+
+        //find the shape point corresponding to the last stop
+        for (i, shape_point) in shape_points.clone().iter().enumerate() {
+            if let Some(time) = shape_point.time  {
+                if time == last_stop.t
+            }
+        }
+
+    }
+
+
 
     let shape_points_copy = shape_points.clone();
     //filter out the shape points that are outside the time window

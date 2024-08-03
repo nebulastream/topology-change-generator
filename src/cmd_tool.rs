@@ -47,16 +47,17 @@ fn main() -> Result<()> {
 
     // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41', 'S42')")?;
     let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41')")?;
+    // let mut stmt = db.prepare("SELECT DISTINCT block_id FROM routes, trips, calendar_dates WHERE trips.route_id=routes.route_id AND trips.service_id=calendar_dates.service_id and routes.route_short_name in ('S41') and calendar_dates.date='2024-07-29'")?;
     // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S3')")?;
     // let mut stmt = db.prepare("SELECT route_id FROM routes")?;
-    let route_ids = stmt.query_map(params![], |row| {
+    let block_ids = stmt.query_map(params![], |row| {
         Ok(row.get::<usize, String>(0))
     })?;
 
     let mut partial_trips = Vec::new();
     // let mut all_shape_points = HashSet::new();
-    for route_id in route_ids {
-        let id = route_id.unwrap().unwrap();
+    for block_id in block_ids {
+        let id = block_id.unwrap().unwrap();
 
         //retrieve trips
         let mut stmt = db.prepare("SELECT route_id, trip_id, service_id FROM trips WHERE route_id=:route_id")?;
