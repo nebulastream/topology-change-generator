@@ -380,18 +380,42 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
 
     //wrap around
     if let Some((first_time, sec_time)) = circular_end_time_tuple {
-        //get the last stop
         let last_stop = stops_in_range.last().unwrap();
-        let stop_center_time = (parse_duration(&stop.arrival_time).unwrap().as_millis() + parse_duration(&stop.departure_time).unwrap().as_millis()) / 2;
-        //get the first stop
-        let first_stop = stops_in_range.first().unwrap();
-
-        //find the shape point corresponding to the last stop
-        for (i, shape_point) in shape_points.clone().iter().enumerate() {
-            if let Some(time) = shape_point.time  {
-                if time == last_stop.t
+        let last_stop_center_time = Duration::from_millis(((parse_duration(&last_stop.arrival_time).unwrap().as_millis() + parse_duration(&last_stop.departure_time).unwrap().as_millis()) / 2) as u64);
+        for (i, p) in shape_points.iter().enumerate().rev() {
+            if let Some(time) = p.time {
+                for j in i + 1..shape_points.len() {
+                    assert!(shape_points[j].time.is_none());
+                    let time_diff = sec_time.checked_sub(time).unwrap();
+                    let num_points = shape_points.len() - i;
+                    let time_diff_per_point = time_diff / num_points as u32;
+                    let time = first_time + time_diff_per_point * (j - i) as u32;
+                    shape_points[j].time = Some(time);
+                }
+                break
             }
         }
+        // //get the last stop
+        // let last_stop = stops_in_range.last().unwrap();
+        // let last_stop_center_time = (parse_duration(&last_stop.arrival_time).unwrap().as_millis() + parse_duration(&last_stop.departure_time).unwrap().as_millis()) / 2;
+        // //get the first stop
+        //
+        // //find the shape point corresponding to the last stop
+        // for (i, shape_point) in shape_points.clone().iter().enumerate() {
+        //     if let Some(time) = shape_point.time  {
+        //         if time.eq(&Duration::from_millis(last_stop_center_time as u64)) {
+        //             for j in i + 1..shape_points.len() {
+        //                 assert!(shape_points[j].time.is_none());
+        //                 let time_diff = sec_time.checked_sub(time).unwrap();
+        //                 let num_points = shape_points.len() - i;
+        //                 let time_diff_per_point = time_diff / num_points as u32;
+        //                 let time = first_time + time_diff_per_point * (j - i) as u32;
+        //                 shape_points[j].time = Some(time);
+        //             }
+        //             break
+        //         }
+        //     }
+        // }
 
     }
 
