@@ -70,8 +70,8 @@ impl MultiTripAndCellData {
 
         //iterate over the shape points of all trips and draw a line to the coordinates of the corresponding tower
         for trip in self.trips.iter() {
-            let mut line = vec![];
             for shape_point in trip.trip.shape_points.iter() {
+                let mut line = vec![];
                 let shape_id = &shape_point.shape_id;
                 if let Some((tower_id, mnc)) = trip.cell_data.get(&(shape_id.clone(), shape_point.shape_pt_sequence)) {
                     if let Some(tower) = self.radio_cells.get(&(*tower_id, *mnc)) {
@@ -80,19 +80,19 @@ impl MultiTripAndCellData {
                 }
                 // push the coordinates of the shape point
                 line.push(vec![shape_point.shape_pt_lon, shape_point.shape_pt_lat]);
+                let geometry = Value::LineString(line);
+                let mut properties = geojson::JsonObject::new();
+                properties.insert("stroke".to_string(), "#673AB7".into());
+                properties.insert("stroke-width".to_string(), 2.into());
+                features.push(geojson::Feature {
+                    bbox: None,
+                    geometry: Some(Geometry::new(geometry)),
+                    id: None,
+                    properties: Some(properties),
+                    foreign_members: None,
+                });
             }
 
-            let geometry = Value::LineString(line);
-            let mut properties = geojson::JsonObject::new();
-            properties.insert("stroke".to_string(), "#673AB7".into());
-            properties.insert("stroke-width".to_string(), 2.into());
-            features.push(geojson::Feature {
-                bbox: None,
-                geometry: Some(Geometry::new(geometry)),
-                id: None,
-                properties: Some(properties),
-                foreign_members: None,
-            });
         }
 
         for (tower_id, tower) in self.radio_cells.iter() {
