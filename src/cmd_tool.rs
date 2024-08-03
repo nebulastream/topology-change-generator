@@ -16,7 +16,7 @@ fn main() -> Result<()> {
     
     //time window
     let start_time = gtfs::parse_duration("08:00:00").unwrap();
-    let end_time = gtfs::parse_duration("08:03:00").unwrap();
+    let end_time = gtfs::parse_duration("09:00:00").unwrap();
     let day = "monday";
     let batchIntervalSizeInSeconds = 20;
     let changeFrequencyInSeconds = 4;
@@ -71,10 +71,6 @@ fn main() -> Result<()> {
             let (route_id, trip_id, service_id) = trip.unwrap();
 
             if let Some(trip) = gtfs::read_stops_for_trip(trip_id.unwrap(), &db, start_time, end_time).unwrap() {
-                // let gj = trip.to_geojson();
-                // for p in &trip.shape_points {
-                //     all_shape_points.insert(p.clone());
-                // }
                 partial_trips.push(trip);
             }
 

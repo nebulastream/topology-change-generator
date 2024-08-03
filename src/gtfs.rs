@@ -46,6 +46,7 @@ impl PartialTrip {
 
 #[derive(Clone, Debug)]
 pub struct Stop {
+    block_id: String,
     trip_id: String,
     pub stop_id: String,
     stop_name: String,
@@ -214,10 +215,11 @@ pub fn parse_duration(time_str: &str) -> rusqlite::Result<Duration, Box<dyn std:
 }
 
 //read the stops for a trip
-pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duration, end_time: Duration) -> rusqlite::Result<Option<PartialTrip>, Box<dyn std::error::Error>> {
+pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Duration, end_time: Duration) -> rusqlite::Result<Option<PartialTrip>, Box<dyn std::error::Error>> {
+    println!("reading stops for trip {}", block_id);
     let mut stmt = db.prepare("SELECT stops.stop_id, arrival_time, departure_time, stop_name FROM stop_times LEFT JOIN stops ON stops.stop_id=stop_times.stop_id WHERE trip_id=:trip_id ")?;
 
-    let stop_times = stmt.query_map(named_params! {":trip_id": trip_id}, |row| {
+    let stop_times = stmt.query_map(named_params! {":trip_id": block_id}, |row| {
         Ok((row.get::<usize, String>(0), row.get::<usize, String>(1), row.get::<usize, String>(2), row.get::<usize, String>(3)))
     })?;
 
@@ -242,7 +244,8 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
             let lat = lat.unwrap();
             let lon = lon.unwrap();
             stops.insert(arrival_time, Stop {
-                trip_id: trip_id.clone(),
+                block_id: block_id.clone(),
+                trip_id: block_id.clone(),
                 stop_id: stop_id.clone(),
                 arrival_time: duration_to_string(arrival_time),
                 departure_time: duration_to_string(departure_time),
@@ -279,7 +282,7 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
     }
 
     let mut stmt = db.prepare("SELECT shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence FROM shapes WHERE shape_id IN (SELECT shape_id FROM trips WHERE trip_id=:trip_id)")?;
-    let shape_points = stmt.query_map(named_params! {":trip_id": trip_id}, |row| {
+    let shape_points = stmt.query_map(named_params! {":trip_id": block_id}, |row| {
         Ok(ShapePoint {
             shape_id: row.get::<usize, String>(0).unwrap(),
             shape_pt_lat: row.get::<usize, f64>(1).unwrap(),
@@ -298,6 +301,13 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
     for shape_point in &mut shape_points {
         shape_points_map.insert(shape_point.shape_pt_sequence, shape_point);
     }
+
+    let shape_sequence_length = shape_points_map.len();
+
+    // let mut ordered_shape_points_map = BTreeMap::new();
+    let mut first_index = None;
+
+    let mut circular_end_time_tuple = None;
 
     // iterate over the stops in the range and try to find a matching shape point
     for (_, stop) in &stops {
@@ -318,12 +328,25 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
             let shape_point = shape_points_map.get_mut(&closest_shape_point).unwrap();
             let stop_center_time = (parse_duration(&stop.arrival_time).unwrap().as_millis() + parse_duration(&stop.departure_time).unwrap().as_millis()) / 2;
             // println!("stop center time: {}, shape index {}, trip id {}", duration_to_string(Duration::from_millis(stop_center_time as u64)), closest_shape_point, trip_id);
+            if let Some(time) = shape_point.time {
+                circular_end_time_tuple = Some((time, Duration::from_millis(stop_center_time as u64)));
+            }
             (*shape_point).time = Some(Duration::from_millis(stop_center_time as u64));
+            if first_index.is_none() {
+                first_index = Some(shape_point.shape_pt_sequence);
+            }
         }
     }
 
+    // for (_, shape_point) in shape_points_map.iter() {
+    //     let new_seq_index = (first_index.unwrap() + shape_point.shape_pt_sequence) % shape_sequence_length as u64;
+    //     ordered_shape_points_map.insert(new_seq_index, (*shape_point).clone());
+    // }
+
+
     //iterate over shape points and interpolate times
     let mut last_time_index = None;
+    // shape_points = ordered_shape_points_map.into_iter().map(|(_, shape_point)| shape_point).collect();
 
     for (i, shape_point) in shape_points.clone().iter().enumerate() {
         //when a shape point with a time is found, start counting the points until the next time
@@ -336,8 +359,9 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
                 let time_diff = if let Some(time_diff) = next_time.checked_sub(last_time) {
                    time_diff
                 } else {
-                    //end of circular line
-                   continue
+                    let (first_time, sec_time): (Duration, Duration) = circular_end_time_tuple.expect("No circular end time");
+                    assert_eq!(sec_time, last_time);
+                    first_time
                 };
                 assert!(time_diff > Duration::from_secs(0));
                 // let time_diff = next_time.checked_sub(last_time).unwrap();
@@ -363,14 +387,14 @@ pub fn read_stops_for_trip(trip_id: String, db: &Connection, start_time: Duratio
     });
 
     if shape_points.is_empty() {
-        println!("No shape points in time window found for trip {}", trip_id);
+        println!("No shape points in time window found for trip {}", block_id);
         return Ok(None);
     }
 
     Ok(
         Some(
             PartialTrip {
-                trip_id,
+                trip_id: block_id,
                 stops: stops_in_range,
                 shape_points,
             }
