@@ -84,7 +84,7 @@ fn main() -> Result<()> {
     let mut stmt = db.prepare("SELECT DISTINCT block_id \
                                              FROM routes, trips, calendar_dates \
                                              WHERE trips.route_id=routes.route_id \
-                                                    AND trips.service_id=calendar_dates.service_id\
+                                                    AND trips.service_id=calendar_dates.service_id \
                                                     AND routes.route_short_name in ('S41') \
                                                     AND calendar_dates.date='2024-07-29'")?;
 
