@@ -14,6 +14,7 @@ polars-io = { version = "0.41.3", features = ["csv"] }
 polars-plan =  "0.41.3"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_with = { version = "3.5.1", features = ["chrono_0_4"] }
+clap = { version = "4.5.13", features = ["derive"] }
 
 [[bin]]
 name = "cmd_tool"

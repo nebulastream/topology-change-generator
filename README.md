@@ -57,7 +57,6 @@ geo_json_path: Path to the file where geo.json will be produced
 
 ```yaml
 file_path: Name of the csv file containing OpenCelliD data.
-networkIdentifier: The network identifier for a network provider whose cell towers need to be selected.
 min_samples: The number of people connected to the base station.
 radio: The type of network the base station support. We use LTE only for our experiments.
 ```
