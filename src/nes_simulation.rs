@@ -230,7 +230,6 @@ impl SimulatedReconnects {
             child_id += 1;
         }
         let source_mapping = if let Some((_, node_to_source)) = &source_placement_maps {
-            // Some(node_to_source.clone())
             Some(node_to_source.clone().into_iter().map(|(k, v)| (k, vec![v])).collect())
         } else {
             None
