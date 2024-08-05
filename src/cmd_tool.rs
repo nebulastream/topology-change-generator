@@ -4,6 +4,7 @@ use simulation_curator::cell_data;
 use simulation_curator::nes_simulation;
 use simulation_curator::nes_simulation::create_single_fog_layer_topology_from_cell_data;
 use clap::Parser;
+use polars::export::arrow::compute::temporal::day;
 
 /// Program to generate topology change events
 #[derive(Parser, Debug)]
