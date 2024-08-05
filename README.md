@@ -37,12 +37,12 @@ dbPath: Path to the gtfs database
 ### Parameters for schedule selection
 
 ```yaml
-start_time                : The time of the day from when the schedule needs to be selected  
-end_time                  : The time of the day till when the schedule needs to be selected
-day                       : The day of the week for which the schedule needs to be selected 
-batchIntervalSizeInSeconds: The time interval in seconds that need to be represented by one second. 
-                            This parameter allows us to speedup the time to increase the rate of topology changes.
-changeFrequencyInSeconds  : The frequency at which the topology changes need to be produced;
+start_time                    : The time of the day from when the schedule needs to be selected  
+end_time                      : The time of the day until when the schedule needs to be selected
+day_of_the_week               : The day of the week (in number) for which the schedule needs to be selected. The week starts with 0 for Sunday and ends at 6 for Saturday.
+batch_interval_size_in_seconds: The time interval in seconds that need to be represented by one second. 
+                                This parameter allows us to speedup the time to increase the rate of topology changes.
+batch_frequency_in_seconds    : The frequency at which the batch of topology changes needs to be produced.
 ```
 
 ### Parameters to store output files
@@ -57,8 +57,8 @@ geo_json_path: Path to the file where geo.json will be produced
 
 ```yaml
 file_path: Name of the csv file containing OpenCelliD data.
-min_samples: The number of people connected to the base station.
-radio: The type of network the base station support. We use LTE only for our experiments.
+min_samples: The minimum number of measurements required for a cellular base station to be included in the experiment.
+radio: The type of network the base station supports. We use LTE only for our experiments.
 ```
 
 ## Output Files
