@@ -31,7 +31,7 @@ Run the command to build and generate the experiment files `cargo run --release`
 ### Gtfs Database parameters
 
 ```yaml
-dbPath: Path to the gtfs database
+db_path: Path to the gtfs database
 ```
 
 ### Parameters for schedule selection
@@ -40,6 +40,7 @@ dbPath: Path to the gtfs database
 start_time                    : The time of the day from when the schedule needs to be selected  
 end_time                      : The time of the day until when the schedule needs to be selected
 day_of_the_week               : The day of the week (in number) for which the schedule needs to be selected. The week starts with 0 for Sunday and ends at 6 for Saturday.
+line_name                     : Name of the train line 
 batch_interval_size_in_seconds: The time interval in seconds that need to be represented by one second. 
                                 This parameter allows us to speedup the time to increase the rate of topology changes.
 batch_frequency_in_seconds    : The frequency at which the batch of topology changes needs to be produced.

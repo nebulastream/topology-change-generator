@@ -1,13 +1,9 @@
-use std::collections::{HashMap, HashSet};
-use rusqlite::{Connection, named_params, params, Result};
-use geo::VincentyDistance;
+use rusqlite::{Connection, named_params, Result};
 use simulation_curator::gtfs;
-use simulation_curator::gtfs::ShapePoint;
 use simulation_curator::cell_data;
 use simulation_curator::nes_simulation;
 use simulation_curator::nes_simulation::create_single_fog_layer_topology_from_cell_data;
 use clap::Parser;
-use polars::export::arrow::compute::temporal::day;
 
 /// Program to generate topology change events
 #[derive(Parser, Debug)]
@@ -15,7 +11,7 @@ use polars::export::arrow::compute::temporal::day;
 struct Args {
     /// Path to the gtfs database
     #[arg(short, long, default_value = "gtfs_vbb.db")]
-    dbPath: String,
+    db_path: String,
 
     ///  The time of the day from when the schedule needs to be selected.
     #[arg(short, long, default_value = "08:00:00")]
@@ -30,7 +26,7 @@ struct Args {
     day_of_the_week: String,
 
     /// The short names of lines for which the schedule needs to be extracted.
-    #[arg(long, default_value = "s41")]
+    #[arg(long, default_value = "S41")]
     line_name: String,
 
     /// The time interval in seconds that need to be represented by one second. This parameter allows us to speedup the time to increase the rate of topology changes.
@@ -71,30 +67,26 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     //db
-    let db = Connection::open(args.dbPath)?;
+    let db = Connection::open(args.db_path)?;
 
     //time window
     let start_time = gtfs::parse_duration(&(args.start_time)).unwrap();
     let end_time = gtfs::parse_duration(&(args.end_time)).unwrap();
-
-    //cell id params
-    let network_id = vec![2, 4, 9]; // For vodafone
-    let beginning_of_2024 = 1704067200;
 
     // get routes and trips for a specific calender date
     let mut stmt = db.prepare("SELECT DISTINCT block_id \
                                                       FROM routes, trips, calendar_dates \
                                                       WHERE routes.route_id=trips.route_id \
                                                       AND trips.service_id=calendar_dates.service_id \
-                                                      AND routes.route_short_name in ('S41') \
-                                                      AND strftime('%w',calendar_dates.date) =:day_of_the_week \
+                                                      AND routes.route_short_name = :line_name \
+                                                      AND strftime('%w',calendar_dates.date) = :day_of_the_week \
                                                       AND calendar_dates.date=( \
                                                             SELECT min(calendar_dates.date) \
                                                             FROM calendar_dates \
                                                             WHERE strftime('%w',calendar_dates.date) =:day_of_the_week)")?;
 
 
-    let block_ids = stmt.query_map(named_params! {":day_of_the_week": args.day_of_the_week},
+    let block_ids = stmt.query_map(named_params! {":line_name": args.line_name, ":day_of_the_week": args.day_of_the_week},
                                    |row| { Ok(row.get::<usize, String>(0)) })?;
 
     let mut partial_trips = Vec::new();
@@ -106,7 +98,11 @@ fn main() -> Result<()> {
     }
 
     println!("partial trips: {}", partial_trips.len());
-    let cells = cell_data::get_closest_cells_from_csv(&(args.open_cell_id_data_loc), &(args.radio), 262, &network_id, 0.0, 0.0, 0, beginning_of_2024, args.min_samples, partial_trips);
+
+    // Find the cell towers used for connection
+    let network_id = vec![2, 4, 9]; // For vodafone
+    let beginning_of_2024 = 1704067200;
+    let cells = cell_data::get_closest_cells_from_csv(&(args.open_cell_id_data_loc), &(args.radio), 262, &network_id, 0, beginning_of_2024, args.min_samples, partial_trips);
     println!("cell towers {}", cells.radio_cells.len());
     let gj = cells.to_geojson();
 
