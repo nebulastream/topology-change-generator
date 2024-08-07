@@ -29,7 +29,7 @@ struct Args {
     #[arg(long, default_value = "S41")]
     line_name: String,
 
-    /// The time interval in seconds that need to be represented by one second. This parameter allows us to speedup the time to increase the rate of topology changes.
+    /// The time interval in seconds to be represented by a single batch. This parameter allows us to speedup the time to increase the rate of topology changes.
     #[arg(long, default_value_t = 20)]
     batch_interval_size_in_seconds: u64,
 

@@ -24,7 +24,7 @@ Environments](https://vbn.aau.dk/ws/portalfiles/portal/515412211/p1753_li.pdf).
 
 # Execution
 
-Run the command to build and generate the experiment files `cargo run --release`
+Run the command to build and generate the experiment files `cargo run --release` with 
 
 # Parameters
 
@@ -41,8 +41,7 @@ start_time                    : The time of the day from when the schedule needs
 end_time                      : The time of the day until when the schedule needs to be selected
 day_of_the_week               : The day of the week (in number) for which the schedule needs to be selected. The week starts with 0 for Sunday and ends at 6 for Saturday.
 line_name                     : Name of the train line 
-batch_interval_size_in_seconds: The time interval in seconds that need to be represented by one second. 
-                                This parameter allows us to speedup the time to increase the rate of topology changes.
+batch_interval_size_in_seconds: The time interval in seconds to be represented by a single batch. This parameter allows us to speedup the time to increase the rate of topology changes.
 batch_frequency_in_seconds    : The frequency at which the batch of topology changes needs to be produced.
 ```
 
