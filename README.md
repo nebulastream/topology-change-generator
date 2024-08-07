@@ -24,7 +24,11 @@ Environments](https://vbn.aau.dk/ws/portalfiles/portal/515412211/p1753_li.pdf).
 
 # Execution
 
-Run the command to build and generate the experiment files `cargo run --release` with 
+Run the command to build the project `cargo build --release`.
+
+Run the following command to generate topology changes with default configurations `target\release\cmad_tool`.
+
+Run the following command to know all command line options `target\release\cmad_tool --help`.
 
 # Parameters
 
