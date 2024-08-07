@@ -1,9 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::{fs, time};
-use std::collections::btree_map::Entry;
 use std::ops::Sub;
 use std::time::Duration;
-// use polars::export::chrono::Duration;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::cell_data::{MultiTripAndCellData, RadioCell};
@@ -53,7 +51,7 @@ impl SimulatedReconnects {
         let mut initial_parents = vec![];
         let mut topology_update_map = BTreeMap::new();
         let mut child_id = topology.nodes.keys().max().unwrap() + 1;
-        let mut reconnect_count = 0;
+        let _reconnect_count = 0;
         let batch_gap = Some(batch_gap.unwrap_or(Duration::from_secs(0)));
 
         cell_data.trips.sort_by(|a, b| a.trip.trip_id.cmp(&b.trip.trip_id));

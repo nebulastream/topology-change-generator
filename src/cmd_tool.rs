@@ -1,107 +1,125 @@
-use std::collections::{HashMap, HashSet};
-use rusqlite::{Connection, named_params, params, Result};
-use geo::VincentyDistance;
+use rusqlite::{Connection, named_params, Result};
 use simulation_curator::gtfs;
-use simulation_curator::gtfs::ShapePoint;
 use simulation_curator::cell_data;
 use simulation_curator::nes_simulation;
 use simulation_curator::nes_simulation::create_single_fog_layer_topology_from_cell_data;
+use clap::Parser;
+
+/// Program to generate topology change events
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Path to the gtfs database
+    #[arg(short, long, default_value = "gtfs_vbb.db")]
+    db_path: String,
+
+    ///  The time of the day from when the schedule needs to be selected.
+    #[arg(short, long, default_value = "08:00:00")]
+    start_time: String,
+
+    /// The time of the day until when the schedule needs to be selected.
+    #[arg(short, long, default_value = "09:00:00")]
+    end_time: String,
+
+    /// The day of the week (in number) for which the schedule needs to be selected. The week starts with 0 for Sunday and ends at 6 for Saturday.
+    #[arg(long, default_value = "1")]
+    day_of_the_week: String,
+
+    /// The short names of lines for which the schedule needs to be extracted.
+    #[arg(long, default_value = "S41")]
+    line_name: String,
+
+    /// The time interval in seconds to be represented by a single batch. This parameter allows us to speedup the time to increase the rate of topology changes.
+    #[arg(long, default_value_t = 20)]
+    batch_interval_size_in_seconds: u64,
+
+    /// The frequency at which the batch of topology changes needs to be produced.
+    #[arg(long, default_value_t = 4)]
+    batch_frequency_in_seconds: u64,
+
+    /// Path to the file where fixed_topology.json will be produced
+    #[arg(long, default_value = "fixed_topology.json")]
+    topology_path: String,
+
+    /// Path to the file where topology_updates.json will be produced
+    #[arg(long, default_value = "topology_updates.json")]
+    topology_updates_path: String,
+
+    /// Path to the file where geo.json will be produced
+    #[arg(short, long, default_value = "geo.json")]
+    geo_json_path: String,
+
+    /// Name of the csv file containing OpenCelliD data.
+    #[arg(short, long, default_value = "OpenCelliDGermanyData.csv")]
+    open_cell_id_data_loc: String,
+
+    /// The minimum number of measurements required for a cellular base station to be included in the experiment.
+    #[arg(short, long, default_value_t = 10)]
+    min_samples: u64,
+
+    /// The type of network the base station supports. We use LTE only for our experiments.
+    #[arg(short, long, default_value = "LTE")]
+    radio: String,
+
+}
 
 fn main() -> Result<()> {
-    //todo: take command line args
-    
+    let args = Args::parse();
+
     //db
-    let dbPath = "gtfs_vbb.db";
-    let db = Connection::open(dbPath)?;
-    
+    let db = Connection::open(args.db_path)?;
+
     //time window
-    let start_time = gtfs::parse_duration("08:00:00").unwrap();
-    let end_time = gtfs::parse_duration("09:00:00").unwrap();
-    let day = "monday";
-    let batchIntervalSizeInSeconds = 20;
-    let changeFrequencyInSeconds = 4;
-    
-    //output paths
-    let topology_path = "fixed_topology.json";
-    let topology_updates_path = "topology_updates.json";
-    let geo_json_path = "geo.json";
-    
-    //cell id params
-    let file_path  = "OpenCelliDGermanyData.csv";
-    let networkIdentifier = vec![2, 4, 9]; // For vodafone
-    let beginning_of_2024 = 1704067200;
-    let min_samples = 10;
-    let radio = "LTE";
+    let start_time = gtfs::parse_duration(&(args.start_time)).unwrap();
+    let end_time = gtfs::parse_duration(&(args.end_time)).unwrap();
 
-    // NebulaStream related config
-    let start_node_id = 2;
-
-    // get any trip id from the line S3 and print all the stop names in order of the trip
-
-    // let mut stmt = db.prepare("SELECT stop_name arrival_time FROM stops WHERE stop_id IN (SELECT stop_id FROM stop_times WHERE trip_id IN (SELECT trip_id FROM trips WHERE route_id IN (SELECT route_id FROM routes WHERE route_short_name='S3') LIMIT 1)) ORDER BY arrival_time")?;
-    // let stop_names = stmt.query_map(params![], |row| {
-    //     Ok(row.get::<usize, String>(0))
-    // })?;
+    // get routes and trips for a specific calender date
+    let mut stmt = db.prepare("SELECT DISTINCT block_id \
+                                                      FROM routes, trips, calendar_dates \
+                                                      WHERE routes.route_id=trips.route_id \
+                                                      AND trips.service_id=calendar_dates.service_id \
+                                                      AND routes.route_short_name = :line_name \
+                                                      AND strftime('%w',calendar_dates.date) = :day_of_the_week \
+                                                      AND calendar_dates.date=( \
+                                                            SELECT min(calendar_dates.date) \
+                                                            FROM calendar_dates \
+                                                            WHERE strftime('%w',calendar_dates.date) =:day_of_the_week)")?;
 
 
-
-    // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41', 'S42')")?;
-    // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S41')")?;
-    let mut stmt = db.prepare("SELECT DISTINCT block_id FROM routes, trips, calendar_dates WHERE trips.route_id=routes.route_id AND trips.service_id=calendar_dates.service_id and routes.route_short_name in ('S41') and calendar_dates.date='2024-07-29'")?;
-    // let mut stmt = db.prepare("SELECT route_id FROM routes WHERE route_short_name IN ('S3')")?;
-    // let mut stmt = db.prepare("SELECT route_id FROM routes")?;
-    let block_ids = stmt.query_map(params![], |row| {
-        Ok(row.get::<usize, String>(0))
-    })?;
+    let block_ids = stmt.query_map(named_params! {":line_name": args.line_name, ":day_of_the_week": args.day_of_the_week},
+                                   |row| { Ok(row.get::<usize, String>(0)) })?;
 
     let mut partial_trips = Vec::new();
     // let mut all_shape_points = HashSet::new();
     for block_id in block_ids {
-        // let id = block_id.unwrap().unwrap();
-        //
-        // //retrieve trips
-        // let mut stmt = db.prepare("SELECT route_id, trip_id, service_id FROM trips WHERE route_id=:route_id")?;
-        // let trips = stmt.query_map(named_params! {":route_id": id}, |row| {
-        //     Ok((row.get::<usize, String>(0), row.get::<usize, String>(1), row.get::<usize, String>(2)))
-        // })?;
-        //
-        // for trip in trips {
-        //
-        //
-        //     //read stops and print geojson
-        //     let (route_id, trip_id, service_id) = trip.unwrap();
-
-            if let Some(trip) = gtfs::read_stops_for_trip(block_id.unwrap().unwrap(), &db, start_time, end_time).unwrap() {
-                partial_trips.push(trip);
-            }
-
-
-        // }
+        if let Some(trip) = gtfs::read_stops_for_trip(block_id.unwrap().unwrap(), &db, start_time, end_time).unwrap() {
+            partial_trips.push(trip);
+        }
     }
-    //todo: move the piecing together logic to a separate lib file
-    
-    //tddo: use or remove coordinates as arguments
+
     println!("partial trips: {}", partial_trips.len());
-    let cells = cell_data::get_closest_cells_from_csv(file_path, radio, 262, &networkIdentifier, 0.0, 0.0, 0, beginning_of_2024, min_samples, partial_trips);
+
+    // Find the cell towers used for connection
+    let network_id = vec![2, 4, 9]; // For vodafone
+    let beginning_of_2024 = 1704067200;
+    let cells = cell_data::get_closest_cells_from_csv(&(args.open_cell_id_data_loc), &(args.radio), 262, &network_id, 0, beginning_of_2024, args.min_samples, partial_trips);
     println!("cell towers {}", cells.radio_cells.len());
-    // let gj = gtfs::to_geojson(partial_trips);
     let gj = cells.to_geojson();
 
-    std::fs::write(geo_json_path, gj.to_string()).unwrap();
+    std::fs::write(args.geo_json_path, gj.to_string()).unwrap();
 
     //set default resources to max value
     let default_resources = u16::MAX;
     //create a topology and write it to json
     let (topology, cell_id_to_node_id) = create_single_fog_layer_topology_from_cell_data(2, default_resources, &cells);
-    topology.write_to_file(topology_path).unwrap();
+    topology.write_to_file(&(args.topology_path)).unwrap();
 
-    let batch_interval = std::time::Duration::from_secs(batchIntervalSizeInSeconds);
-    let batch_gap = std::time::Duration::from_secs(changeFrequencyInSeconds);
+    let batch_interval = std::time::Duration::from_secs(args.batch_interval_size_in_seconds);
+    let batch_gap = std::time::Duration::from_secs(args.batch_frequency_in_seconds);
     let simulated_reconnects = nes_simulation::SimulatedReconnects::from_topology_and_cell_data(topology, cells, cell_id_to_node_id, start_time, batch_interval.into(), batch_gap.into());
-    // let simulated_reconnects = nes_simulation::SimulatedReconnects::from_topology_and_cell_data(topology, cells, cell_id_to_node_id, start_time, None, None);
     println!("topology updates: {}", simulated_reconnects.topology_updates.len());
     let json_string = serde_json::to_string_pretty(&simulated_reconnects).unwrap();
-    std::fs::write(topology_updates_path, json_string).unwrap();
+    std::fs::write(args.topology_updates_path, json_string).unwrap();
 
     Ok(())
 }

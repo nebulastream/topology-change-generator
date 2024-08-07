@@ -1,12 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use polars::prelude::*;
-use polars_io::prelude::*;
 use polars_plan::plans::lit;
-use std::fs::File;
 use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
 use polars::datatypes::DataType;
 use polars_plan::prelude::col;
-use rusqlite::Map;
 use crate::geo_utils;
 use crate::gtfs::{get_shape_points_from_trips, partial_trips_to_feature_collection, PartialTrip, ShapePoint};
 
@@ -27,10 +24,6 @@ pub fn read_cell_data_csv(file_path: &str) -> PolarsResult<DataFrame, > {
     schema.with_column("created".parse().unwrap(), DataType::UInt64);
     schema.with_column("updated".parse().unwrap(), DataType::UInt64);
     schema.with_column("average_signal".parse().unwrap(), DataType::UInt64);
-
-
-    // get the file stream
-    let file = std::fs::File::open(file_path).unwrap();
 
     // read the csv file
     CsvReadOptions::default()
@@ -64,7 +57,6 @@ impl MultiTripAndCellData {
         })
     }
     pub fn to_features(&self) -> Vec<Feature> {
-        // let mut features = partial_trips_to_feature_collection(self.trips.iter().collect::<Vec<_>>().iter().map(|t| t.trip.clone()));
         let trips = self.trips.iter().map(|t| t.trip.clone()).collect();
         let mut features = partial_trips_to_feature_collection(&trips);
 
@@ -92,51 +84,44 @@ impl MultiTripAndCellData {
                     foreign_members: None,
                 });
             }
-
         }
 
-        for (tower_id, tower) in self.radio_cells.iter() {
+        for (_, tower) in self.radio_cells.iter() {
             features.push(tower.to_feature());
         }
-        //todo: add lines
         features
     }
 }
 
 
-
-pub fn get_closest_cells_from_csv(file_path: &str, radio: &str, mcc: u32, mncs: &Vec<u32>, lon: f64, lat: f64, start_time: u64, updated: u64, sample_count: u64, trips: Vec<PartialTrip>) -> MultiTripAndCellData {
+pub fn get_closest_cells_from_csv(file_path: &str, radio: &str, mcc: u32, mncs: &Vec<u32>, start_time: u64, updated: u64, sample_count: u64, trips: Vec<PartialTrip>) -> MultiTripAndCellData {
     let mut towers = HashMap::new();
-    // find_closest_towers(file_path, radio, mcc, mncs, lon, lat, start_time, updated, sample_count, shape_points, &mut towers);
 
     // get the shape points from the list of trips
     let shape_points = get_shape_points_from_trips(&trips);
 
     //read and filter cell data
-    add_cell_data(file_path, radio, mcc, mncs, lon, lat, start_time, updated, sample_count, &shape_points, &mut towers);
+    add_cell_data(file_path, radio, mcc, mncs, start_time, updated, sample_count, &shape_points, &mut towers);
 
     let mut trips_and_cells = vec![];
     for trip in trips {
         let mut shape_id_to_cell_id = HashMap::new();
-        find_closest_towers(radio, mcc, mncs, lon, lat, start_time, updated, sample_count, &shape_points, &mut towers, &mut shape_id_to_cell_id);
+        find_closest_towers(&shape_points, &mut towers, &mut shape_id_to_cell_id);
         let trip_and_cell_data = TripAndCellData {
             trip,
-            cell_data: shape_id_to_cell_id
+            cell_data: shape_id_to_cell_id,
         };
         trips_and_cells.push(trip_and_cell_data);
     }
     //find closest cells for each shape point
-
-
-    // towers.into_values().collect()
     MultiTripAndCellData {
         trips: trips_and_cells,
-        radio_cells: towers
+        radio_cells: towers,
     }
 }
 
 // filter radio tower data by radio type, mcc, location and update time
-pub fn filter_cell_data(df: &DataFrame, radio: &str, mcc: u32, mncs: &Vec<u32>, lon: f64, lat: f64, start_time: u64, updated: u64, sample_count: u64) -> PolarsResult<DataFrame> {
+pub fn filter_cell_data(df: &DataFrame, radio: &str, mcc: u32, mncs: &Vec<u32>, start_time: u64, updated: u64, sample_count: u64) -> PolarsResult<DataFrame> {
     let mnc_series = Series::new("mnc", mncs);
     df
         .clone()
@@ -145,9 +130,6 @@ pub fn filter_cell_data(df: &DataFrame, radio: &str, mcc: u32, mncs: &Vec<u32>, 
             col("radio").eq(lit(radio))
                 .and(col("mcc").eq(lit(mcc)))
                 .and(col("mnc").is_in(lit(mnc_series)))
-                //todo: calculate bounding box
-                // .and(col("lon").eq(lit(lon)))
-                // .and(col("lat").eq(lit(lat)))
                 .and(col("created").gt(lit(start_time)))
                 .and(col("updated").gt(lit(updated)))
                 .and(col("samples").gt(lit(sample_count)))
@@ -160,12 +142,11 @@ pub struct RadioCell {
     pub lon: f64,
     pub id: u64,
     range: f64,
-    pub mnc: u64
+    pub mnc: u64,
 }
 
 impl RadioCell {
     fn to_feature(&self) -> geojson::Feature {
-        let geometry = Value::Point(vec![self.lon, self.lat]);
         let mut properties = geojson::JsonObject::new();
         properties.insert("id".to_string(), serde_json::Value::Number(self.id.into()));
         properties.insert("marker-color".to_string(), "#673AB7".into());
@@ -180,9 +161,8 @@ impl RadioCell {
     }
 }
 
-pub fn find_towers_in_range(df: DataFrame, radio: &str, mcc: u32, mncs: &Vec<u32>, lon: f64, lat: f64, start_time: u64, updated: u64, sample_count: u64, shape_points: &Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>) {
+pub fn find_towers_in_range(df: DataFrame, shape_points: &Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>) {
     for point in shape_points {
-        let shape_id = point.shape_id.clone();
         if let Some(closest) = find_closest_tower(&df, point) {
             let tower_identifier = (closest.id, closest.mnc);
             towers.insert(tower_identifier, closest);
@@ -192,46 +172,31 @@ pub fn find_towers_in_range(df: DataFrame, radio: &str, mcc: u32, mncs: &Vec<u32
 
 // read cell data, apply filters and find closest towers to a shape point
 //todo: check which params can be reference instead of owned vals
-pub fn find_closest_towers(radio: &str, mcc: u32, mncs: &Vec<u32>, lon: f64, lat: f64, start_time: u64, updated: u64, sample_count: u64, shape_points: &Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>, point_id_to_towers: &mut HashMap<(String, u64), (u64, u64)>) {
+pub fn find_closest_towers(shape_points: &Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>, point_id_to_towers: &mut HashMap<(String, u64), (u64, u64)>) {
     for point in shape_points {
         let shape_point_identifier = (point.shape_id.clone(), point.shape_pt_sequence);
         if let Some(closest) = find_closest_tower_from_map(towers, point) {
             let tower_identifier = (closest.id, closest.mnc);
             point_id_to_towers.insert(shape_point_identifier, tower_identifier);
-            // towers.insert(tower_identifier, closest);
         }
     }
 }
 
-pub fn add_cell_data(file_path: &str, radio: &str, mcc: u32, mncs: &Vec<u32>, lon: f64, lat: f64, start_time: u64, updated: u64, sample_count: u64, shape_points: &Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>) {
+pub fn add_cell_data(file_path: &str, radio: &str, mcc: u32, mncs: &Vec<u32>, start_time: u64, updated: u64, sample_count: u64, shape_points: &Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>) {
     let df = read_cell_data_csv(file_path).unwrap();
-    let filtered = filter_cell_data(&df, radio, mcc, &mncs, lon, lat, start_time, updated, sample_count).unwrap();
-    find_towers_in_range(filtered, radio, mcc, mncs, lon, lat, start_time, updated, sample_count, shape_points, towers);
+    let filtered = filter_cell_data(&df, radio, mcc, &mncs, start_time, updated, sample_count).unwrap();
+    find_towers_in_range(filtered, shape_points, towers);
 }
 
-// pub fn find_closest_towers(file_path: &str, radio: &str, mcc: u32, mncs: Vec<u32>, lon: f64, lat: f64, start_time: u64, updated: u64, sample_count: u64, shape_points: Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>, point_id_to_towers: &mut HashMap<String, (u64, u64)>) {
-//     let df = read_cell_data_csv(file_path).unwrap();
-//     let filtered = filter_cell_data(&df, radio, mcc, mncs, lon, lat, start_time, updated, sample_count).unwrap();
-//     for point in shape_points {
-//         let shape_id = point.shape_id.clone();
-//         if let Some(closest) = find_closest_tower(&filtered, point) {
-//             let tower_identifier = (closest.id, closest.mnc);
-//             point_id_to_towers.insert(shape_id, tower_identifier);
-//             towers.insert(tower_identifier, closest);
-//         }
-//     }
-// }
-
-//todo: rename all occurences of tower
 fn find_closest_tower_from_map(id_to_cell: &mut HashMap<(u64, u64), RadioCell>, point: &ShapePoint) -> Option<RadioCell> {
     //iterator over the rows
     let mut closest = None;
     let mut min_distance = f64::MAX;
-    for (tower_id, tower) in id_to_cell.iter() {
-        let distance = geo_utils::vincenty_dist_between_coordinates((tower.lat, tower.lon), (point.shape_pt_lat, point.shape_pt_lon));
+    for (_, radio_cell) in id_to_cell.iter() {
+        let distance = geo_utils::vincenty_dist_between_coordinates((radio_cell.lat, radio_cell.lon), (point.shape_pt_lat, point.shape_pt_lon));
         if distance < min_distance {
             min_distance = distance;
-            closest = Some(tower.clone());
+            closest = Some(radio_cell.clone());
         }
     }
 
@@ -239,8 +204,6 @@ fn find_closest_tower_from_map(id_to_cell: &mut HashMap<(u64, u64), RadioCell>, 
     if let Some(closest) = &closest {
         let distance = geo_utils::vincenty_dist_between_coordinates((closest.lat, closest.lon), (point.shape_pt_lat, point.shape_pt_lon));
         if distance > closest.range {
-            //todo: do not panic but handle gracefully
-            // panic!("closest tower at distance {} but range is {}", distance, closest.range);
             println!("closest tower at distance {} but range is {}", distance, closest.range);
         }
     }
@@ -269,7 +232,7 @@ fn find_closest_tower(df: &DataFrame, point: &ShapePoint) -> Option<RadioCell> {
                 lon,
                 id: id,
                 range: range,
-                mnc
+                mnc,
             });
         }
     }
@@ -282,15 +245,8 @@ pub fn read_and_print_cell_data_csv(file_path: &str) -> PolarsResult<()> {
     let vodafone_mncs = vec![2, 4, 9];
     let beginning_of_2024 = 1704067200;
     let min_samples = 100;
-    let filtered = filter_cell_data(&df, "LTE", 262, &vodafone_mncs, 0.0, 0.0, 0, beginning_of_2024, min_samples)?;
+    let filtered = filter_cell_data(&df, "LTE", 262, &vodafone_mncs, 0, beginning_of_2024, min_samples)?;
     println!("{:?}", df);
     println!("{:?}", filtered);
     Ok(())
-}
-
-enum Radio {
-    GSM,
-    UMTS,
-    LTE,
-    _5G,
 }

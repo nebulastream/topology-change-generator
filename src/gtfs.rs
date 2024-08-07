@@ -1,7 +1,7 @@
-use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
+use geojson::{Feature, GeoJson, Geometry, Value};
 use std::time::Duration;
 use rusqlite::{Connection, named_params};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap};
 use std::hash::{Hash, Hasher};
 use geo::VincentyDistance;
 use crate::colors;
@@ -24,29 +24,8 @@ pub fn get_shape_points_from_trips(trips: &Vec<PartialTrip>) -> Vec<ShapePoint> 
     shape_points
 }
 
-impl PartialTrip {
-    fn to_geojson(&self) -> GeoJson {
-        GeoJson::FeatureCollection(self.to_feature_collection())
-    }
-
-    fn to_feature_collection(&self) -> FeatureCollection {
-        let mut properties = geojson::JsonObject::new();
-        properties.insert("trip_id".to_string(), serde_json::Value::String(self.trip_id.clone()));
-        let mut features = Vec::new();
-        for stop in &self.stops {
-            features.push(stop.to_feature(None));
-        }
-        FeatureCollection {
-            bbox: None,
-            features,
-            foreign_members: None,
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Stop {
-    block_id: String,
     trip_id: String,
     pub stop_id: String,
     stop_name: String,
@@ -90,12 +69,6 @@ fn feature_line_from_shape_points(shape_points: &Vec<ShapePoint>) -> Feature {
     let mut shape_points = shape_points.clone();
     shape_points.sort_by_key(|x| x.time.unwrap());
     for shape_point in shape_points {
-        //print the time
-        if let Some(time) = shape_point.time {
-            // println!("time: {}", duration_to_string(time));
-        } else {
-            // println!("no time");
-        }
         coordinates.push(vec![shape_point.shape_pt_lon, shape_point.shape_pt_lat]);
     }
     Feature {
@@ -146,7 +119,7 @@ pub fn partial_trips_to_feature_collection(trips: &Vec<PartialTrip>) -> Vec<Feat
         }
     }
     let mut features = Vec::new();
-    let mut palette = colors::generate_color_palette(stops.len());
+    let palette = colors::generate_color_palette(stops.len());
     for (i, stop) in stops.iter().enumerate() {
         features.push(stop.to_feature(Some(palette[i].as_str())));
     }
@@ -159,7 +132,7 @@ pub fn partial_trips_to_feature_collection(trips: &Vec<PartialTrip>) -> Vec<Feat
     // for all shape points that have a time, add a point feature as well
     for trip in trips {
         for shape_point in &trip.shape_points {
-            if let Some(time) = shape_point.time {
+            if let Some(_) = shape_point.time {
                 features.push(shape_point.to_feature());
             }
         }
@@ -169,10 +142,6 @@ pub fn partial_trips_to_feature_collection(trips: &Vec<PartialTrip>) -> Vec<Feat
 }
 
 impl Stop {
-    fn to_geojson(&self) -> GeoJson {
-        GeoJson::Feature(self.to_feature(None))
-    }
-
     fn to_feature(&self, color: Option<&str>) -> Feature {
         let mut properties = geojson::JsonObject::new();
         properties.insert("stop_id".to_string(), serde_json::Value::String(self.stop_id.clone()));
@@ -255,7 +224,6 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
                 let lat = lat.unwrap();
                 let lon = lon.unwrap();
                 stops.insert(arrival_time, Stop {
-                    block_id: block_id.clone(),
                     trip_id: trip.clone(),
                     stop_id: stop_id.clone(),
                     arrival_time: duration_to_string(arrival_time),
@@ -313,22 +281,16 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
             shape_points_map.insert(shape_point.shape_pt_sequence, shape_point);
         }
 
-        let shape_sequence_length = shape_points_map.len();
-
-        // let mut ordered_shape_points_map = BTreeMap::new();
         let mut first_index = None;
-
         let mut circular_end_time_tuple = None;
 
         // iterate over the stops in the range and try to find a matching shape point
         for (_, stop) in &stops {
-            // println!("checking stop {}, arrival time", stop.stop_name);
             let mut closest_shape_point_sequence = None;
             let mut closest_distance = f64::MAX;
             for (_, shape_point) in shape_points_map.iter() {
                 let stop_point = geo::Point::new(stop.lon, stop.lat);
                 let shape_point_geo = geo::Point::new(shape_point.shape_pt_lon, shape_point.shape_pt_lat);
-                // let distance = stop_point.vincenty_distance(&shape_point_geo).unwrap();
                 let distance = shape_point_geo.vincenty_distance(&stop_point).unwrap();
                 if distance < closest_distance {
                     closest_distance = distance;
@@ -338,7 +300,6 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
             if let Some(closest_shape_point) = closest_shape_point_sequence {
                 let shape_point = shape_points_map.get_mut(&closest_shape_point).unwrap();
                 let stop_center_time = (parse_duration(&stop.arrival_time).unwrap().as_millis() + parse_duration(&stop.departure_time).unwrap().as_millis()) / 2;
-                // println!("stop center time: {}, shape index {}, trip id {}", duration_to_string(Duration::from_millis(stop_center_time as u64)), closest_shape_point, trip_id);
                 if let Some(time) = shape_point.time {
                     circular_end_time_tuple = Some((time, Duration::from_millis(stop_center_time as u64)));
                 }
@@ -349,15 +310,8 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
             }
         }
 
-        // for (_, shape_point) in shape_points_map.iter() {
-        //     let new_seq_index = (first_index.unwrap() + shape_point.shape_pt_sequence) % shape_sequence_length as u64;
-        //     ordered_shape_points_map.insert(new_seq_index, (*shape_point).clone());
-        // }
-
-
         //iterate over shape points and interpolate times
         let mut last_time_index = None;
-        // shape_points = ordered_shape_points_map.into_iter().map(|(_, shape_point)| shape_point).collect();
 
         for (i, shape_point) in shape_points.clone().iter().enumerate() {
             //when a shape point with a time is found, start counting the points until the next time
@@ -388,8 +342,6 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
 
         //wrap around
         if let Some((first_time, sec_time)) = circular_end_time_tuple {
-            let last_stop = stops_in_range.last().unwrap();
-            let last_stop_center_time = Duration::from_millis(((parse_duration(&last_stop.arrival_time).unwrap().as_millis() + parse_duration(&last_stop.departure_time).unwrap().as_millis()) / 2) as u64);
             for (i, p) in shape_points.iter().enumerate().rev() {
                 if let Some(time) = p.time {
                     for j in i + 1..shape_points.len() {
@@ -403,31 +355,8 @@ pub fn read_stops_for_trip(block_id: String, db: &Connection, start_time: Durati
                     break;
                 }
             }
-            // //get the last stop
-            // let last_stop = stops_in_range.last().unwrap();
-            // let last_stop_center_time = (parse_duration(&last_stop.arrival_time).unwrap().as_millis() + parse_duration(&last_stop.departure_time).unwrap().as_millis()) / 2;
-            // //get the first stop
-            //
-            // //find the shape point corresponding to the last stop
-            // for (i, shape_point) in shape_points.clone().iter().enumerate() {
-            //     if let Some(time) = shape_point.time  {
-            //         if time.eq(&Duration::from_millis(last_stop_center_time as u64)) {
-            //             for j in i + 1..shape_points.len() {
-            //                 assert!(shape_points[j].time.is_none());
-            //                 let time_diff = sec_time.checked_sub(time).unwrap();
-            //                 let num_points = shape_points.len() - i;
-            //                 let time_diff_per_point = time_diff / num_points as u32;
-            //                 let time = first_time + time_diff_per_point * (j - i) as u32;
-            //                 shape_points[j].time = Some(time);
-            //             }
-            //             break
-            //         }
-            //     }
-            // }
         }
 
-
-        let shape_points_copy = shape_points.clone();
         //filter out the shape points that are outside the time window
         shape_points.retain(|x| {
             if let Some(time) = x.time {
