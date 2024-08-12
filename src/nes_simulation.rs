@@ -83,8 +83,10 @@ impl SimulatedReconnects {
         //create a hashmap to store the mapping from source ids to trip ids
         let mut source_placement = HashMap::new();
         //todo: do not clone
+        println!("Creating source placement");
         let mut i = 0;
         for trips in block_map.values() {
+            println!("Processing route {}", trips.first().unwrap().trip.route_id);
             //create a vactor of references to the trips
             // let mut trip_refs: Vec<&PartialTrip> = trips.iter().collect();
             let mut blocks: Vec<PartialBlock> = trips.iter().map(|x| x.trip.clone()).collect();
@@ -99,9 +101,14 @@ impl SimulatedReconnects {
                 // for (i, trip) in blocks.iter().enumerate() {
                 //get the source id
                 let source_id = i as u64 / group_size as u64;
+                println!("Placing source {} on block {} with index {} of route {}", source_id, trip.block_id, i, trip.route_id);
                 //insert the source id and the trip id into the hashmap
                 source_placement.insert(trip.block_id.clone(), source_id);
                 i += 1;
+            }
+            let remainder = i % group_size as u64;
+            if remainder != 0 {
+                i += group_size as u64 - remainder;
             }
         }
         source_placement

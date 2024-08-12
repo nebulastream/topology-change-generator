@@ -87,7 +87,7 @@ fn main() -> Result<()> {
     let end_time = gtfs::parse_duration(&(args.end_time)).unwrap();
 
     // get routes and trips for a specific calender date
-    let mut stmt = db.prepare("SELECT DISTINCT block_id, trips.route_id \
+    let mut stmt = db.prepare("SELECT DISTINCT block_id, routes.route_short_name \
                                                   FROM routes, trips, calendar_dates \
                                                   WHERE routes.route_id=trips.route_id \
                                                   AND trips.service_id=calendar_dates.service_id \

@@ -116,7 +116,7 @@ pub fn get_closest_cells_from_csv(file_path: &str, radio: &str, mcc: u32, mncs: 
         };
         
         //create new vector in hash map or push to existing
-        let trips_and_cells = trips_and_cells_map.entry(trip.block_id.clone()).or_insert(vec![]);
+        let trips_and_cells = trips_and_cells_map.entry(trip.route_id.clone()).or_insert(vec![]);
            
         trips_and_cells.push(trip_and_cell_data);
     }
