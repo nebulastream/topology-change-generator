@@ -44,7 +44,7 @@ pub struct TripAndCellData {
 
 #[derive(Debug)]
 pub struct MultiTripAndCellData {
-    pub trips: Vec<TripAndCellData>,
+    pub trips: HashMap<String, Vec<TripAndCellData>>,
     pub radio_cells: HashMap<(u64, u64), RadioCell>,
 }
 
@@ -59,11 +59,11 @@ impl MultiTripAndCellData {
         })
     }
     pub fn to_features(&self) -> Vec<Feature> {
-        let trips = self.trips.iter().map(|t| t.trip.clone()).collect();
+        let trips = self.trips.values().flatten().map(|t| t.trip.clone()).collect();
         let mut features = partial_trips_to_feature_collection(&trips);
 
         //iterate over the shape points of all trips and draw a line to the coordinates of the corresponding tower
-        for trip in self.trips.iter() {
+        for trip in self.trips.values().flatten() {
             for shape_point in trip.trip.shape_points.iter() {
                 let mut line = vec![];
                 let shape_id = &shape_point.shape_id;
@@ -105,7 +105,8 @@ pub fn get_closest_cells_from_csv(file_path: &str, radio: &str, mcc: u32, mncs: 
     //read and filter cell data
     add_cell_data(file_path, radio, mcc, mncs, start_time, updated, sample_count, &shape_points, &mut towers);
 
-    let mut trips_and_cells = vec![];
+    // let mut trips_and_cells = vec![];
+    let mut trips_and_cells_map = HashMap::new();
     for trip in trips {
         let mut shape_id_to_cell_id = HashMap::new();
         find_closest_towers(&shape_points, &mut towers, &mut shape_id_to_cell_id);
@@ -113,11 +114,15 @@ pub fn get_closest_cells_from_csv(file_path: &str, radio: &str, mcc: u32, mncs: 
             trip: trip.clone(),
             cell_data: shape_id_to_cell_id,
         };
+        
+        //create new vector in hash map or push to existing
+        let trips_and_cells = trips_and_cells_map.entry(trip.block_id.clone()).or_insert(vec![]);
+           
         trips_and_cells.push(trip_and_cell_data);
     }
     //find closest cells for each shape point
     MultiTripAndCellData {
-        trips: trips_and_cells,
+        trips: trips_and_cells_map,
         radio_cells: towers,
     }
 }

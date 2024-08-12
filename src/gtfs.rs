@@ -9,6 +9,7 @@ use crate::colors;
 #[derive(Clone, Debug)]
 pub struct PartialBlock {
     pub block_id: String,
+    pub route_id: String,
     pub stops: Vec<Stop>,
     pub shape_points: Vec<ShapePoint>,
 }
@@ -186,7 +187,7 @@ pub fn parse_duration(time_str: &str) -> rusqlite::Result<Duration, Box<dyn std:
 }
 
 //read the stops for a trip
-pub fn read_stops_for_block(block_id: String, db: &Connection, start_time: Duration, end_time: Duration) -> rusqlite::Result<Option<PartialBlock>, Box<dyn std::error::Error>> {
+pub fn read_stops_for_block(block_id: String, route_id: String, db: &Connection, start_time: Duration, end_time: Duration) -> rusqlite::Result<Option<PartialBlock>, Box<dyn std::error::Error>> {
     println!("reading stops for block {}", block_id);
     let mut stmt = db.prepare("SELECT DISTINCT trip_id FROM trips WHERE trips.block_id=:block_id")?;
     let trip_ids = stmt.query_map(named_params! {":block_id": block_id}, |row| {
@@ -381,7 +382,8 @@ pub fn read_stops_for_block(block_id: String, db: &Connection, start_time: Durat
     Ok(
         Some(
             PartialBlock {
-                block_id: block_id,
+                block_id,
+                route_id,
                 stops: all_stops_in_range,
                 shape_points: all_shape_points,
             }

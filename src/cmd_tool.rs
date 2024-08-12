@@ -87,25 +87,29 @@ fn main() -> Result<()> {
     let end_time = gtfs::parse_duration(&(args.end_time)).unwrap();
 
     // get routes and trips for a specific calender date
-    let mut stmt = db.prepare("SELECT DISTINCT block_id \
-                                                      FROM routes, trips, calendar_dates \
-                                                      WHERE routes.route_id=trips.route_id \
-                                                      AND trips.service_id=calendar_dates.service_id \
-                                                      AND routes.route_short_name = :line_name \
-                                                      AND strftime('%w',calendar_dates.date) = :day_of_the_week \
-                                                      AND calendar_dates.date=( \
-                                                            SELECT min(calendar_dates.date) \
-                                                            FROM calendar_dates \
-                                                            WHERE strftime('%w',calendar_dates.date) =:day_of_the_week)")?;
+    let mut stmt = db.prepare("SELECT DISTINCT block_id, trips.route_id \
+                                                  FROM routes, trips, calendar_dates \
+                                                  WHERE routes.route_id=trips.route_id \
+                                                  AND trips.service_id=calendar_dates.service_id \
+                                                  AND routes.route_short_name in ('S41', 'S42') \
+                                                  AND trips.block_id NOTNULL
+                                                  AND calendar_dates.date=( \
+                                                        SELECT min(calendar_dates.date) \
+                                                        FROM calendar_dates \
+                                                        WHERE strftime('%w',calendar_dates.date) =:day_of_the_week)")?;
 
 
-    let block_ids = stmt.query_map(named_params! {":line_name": args.line_name, ":day_of_the_week": args.day_of_the_week},
-                                   |row| { Ok(row.get::<usize, String>(0)) })?;
+    // let block_ids = stmt.query_map(named_params! {":line_name": args.line_name, ":day_of_the_week": args.day_of_the_week},
+    //                                |row| { Ok(row.get::<usize, String>(0)) })?;
+    let block_ids = stmt.query_map(named_params! {":day_of_the_week": args.day_of_the_week},
+                                   |row| { Ok((row.get::<usize, String>(0), row.get::<usize, String>(1))) })?;
 
     let mut partial_blocks = Vec::new();
     for block_id in block_ids {
-        if let Some(trip) = gtfs::read_stops_for_block(block_id.unwrap().unwrap(), &db, start_time, end_time).unwrap() {
-            partial_blocks.push(trip);
+        if let Ok((block_id, route_id)) = block_id {
+            if let Some(trip) = gtfs::read_stops_for_block(block_id?, route_id?, &db, start_time, end_time).unwrap() {
+                partial_blocks.push(trip);
+            }
         }
     }
 
@@ -144,7 +148,7 @@ fn main() -> Result<()> {
             let node_id = trip_to_node.get(&block.block_id).unwrap();
             let source_group = source_groups.get(node_id).unwrap();
             if let Some(first_stop) = block.stops.first() {
-                println!("Block {} interpolation started at stop: {} and is assigned source group: {}", block.block_id,  first_stop.stop_name, source_group.first().unwrap());
+                println!("Block {}, Route {} interpolation started at stop: {} and is assigned source group: {}", block.block_id, block.route_id, first_stop.stop_name, source_group.first().unwrap());
             } else {
                 panic!("Block: {}, source group: {} does not have any associated stops", block.block_id, source_group.first().unwrap());
             }
