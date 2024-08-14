@@ -199,10 +199,10 @@ impl SimulatedReconnects {
                                 if rem.parent_id == add.parent_id {
                                     println!("Mobile node had an edge removed and added to the same parent in the same batch, skipping");
                                 } else {
+                                    previous_parent_id = add.parent_id;
                                     let update_at_time = topology_update_map.entry(current_batch_timestamp.unwrap()).or_insert(TopologyUpdate { timestamp: current_batch_timestamp.unwrap(), events: vec![] });
                                     update_at_time.events.push(rem);
                                     update_at_time.events.push(add);
-                                    previous_parent_id = parent_id;
                                 }
                             }
                             
