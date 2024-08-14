@@ -165,7 +165,7 @@ impl SimulatedReconnects {
                 let cell_id = trip.cell_data.get(&(shape_id, sequence_nr)).unwrap();
                 parent_id = *cell_id_to_node_id.get(cell_id).unwrap();
 
-                if parent_id != previous_parent_id {
+                // if parent_id != previous_parent_id {
                     //create topology update
                     let timestamp = point.time.expect("No time set for shape point").sub(start_time);
 
@@ -195,14 +195,22 @@ impl SimulatedReconnects {
                         } else {
                             //insert batch
                             if let Some(rem) = batched_rem {
-                                let update_at_time = topology_update_map.entry(current_batch_timestamp.unwrap()).or_insert(TopologyUpdate { timestamp: current_batch_timestamp.unwrap(), events: vec![] });
-                                update_at_time.events.push(rem);
-                                update_at_time.events.push(batched_add.unwrap());
+                                let add = batched_add.expect("Mobile node had an edge removed but no new one added");
+                                if rem.parent_id == add.parent_id {
+                                    println!("Mobile node had an edge removed and added to the same parent in the same batch, skipping");
+                                } else {
+                                    let update_at_time = topology_update_map.entry(current_batch_timestamp.unwrap()).or_insert(TopologyUpdate { timestamp: current_batch_timestamp.unwrap(), events: vec![] });
+                                    update_at_time.events.push(rem);
+                                    update_at_time.events.push(add);
+                                    previous_parent_id = parent_id;
+                                }
                             }
                             
                             //start new batch
-                            batched_rem = Some(remove_event);
-                            batched_add = Some(add_event);
+                            // batched_rem = Some(remove_event);
+                            // batched_add = Some(add_event);
+                            batched_rem = None;
+                            batched_add = None;
 
                             //increment batch start time until we arrive at the batch containing the current time stamp
                             while timestamp > current_batch_interval_start.unwrap() + interval {
@@ -225,10 +233,10 @@ impl SimulatedReconnects {
                             action: ISQPEventAction::add,
                         });
                     }
-                }
+                // }
 
 
-                previous_parent_id = parent_id;
+                // previous_parent_id = parent_id;
             }
 
             if let Some(rem) = batched_rem {
