@@ -19,11 +19,11 @@ We couple this trajectory information together with the cell tower data from Ope
 The trains then works as the mobile devices and cell tower s the edge nodes that provide compute resources outside the cloud datacenter. 
 The below image shows the train trajectory with green line and cell towers with green dots along the line:
 
-![alt text](./Experiments/Line-S41/TrainTrajectory.png "Train trajectory")
+![alt text](./Experiments/Line-S41-S42/TrainTrajectory.png "Train trajectory")
 
-We select the schedule for 20 minutes for S41 and S42 on a weekday (Monday).
+We select the schedule for 20 minutes for S41 and S42 on a weekday (Monday). 
 This results in overall 24 trains serving the passengers.
-We then condense the 20-minute schedule to perform a two-minute emulation to increase the number of activities in the train network.
+We then condense the 20-minute schedule to perform a two-minute emulation to increase the number of activities in the train network. 
 Please note that in the real world, we expect many reconnects due to more lines without the need to compress the schedule.
 During the emulation, the trains carry passengers from one station to another.
 As they move along the track, they disconnect from a cell tower and reconnect to the neighboring one.
@@ -36,11 +36,12 @@ NebulaStream uses a greedy but fast operator re-placement strategy called _incre
 The strategy identifies the increment of operators needing re-placement and concurrently processes the affected operator increments.
 Afterward, NebulaStream combines fine-grained reconfiguration protocol and buffering at the upstream nodes to quickly resume the interrupted queries.
 To show the effect of different strategies, we report the overall processing latency of running queries as trains move on the track.
-To conduct this experiment, we deployed 60 queries.  
+To conduct this experiment, we deployed 60 queries.
 Here, **NES** is the state-of-the-art strategy of completely un-deploying the affected queries, serially performing holistic re-placement, and re-deployment of all un-deployed queries based on the latest topology state.
-**HSQP** is our improved baseline, where we perform holistic re-placement and re-deployment like for __NES__. However, all affected queries are processed concurrently.
+**HSQP** is our improved baseline, where we perform holistic re-placement and re-deployment like for __NES__. 
+However, all affected queries are processed concurrently. 
 
-![alt text](./Experiments/Line-S41/ProcessingTimeLatency.png "Impact on Processing Latency")
+![alt text](./Experiments/Line-S41-S42/ProcessingTimeLatency.png "Impact on Processing Latency")
 
 # Pre-Processing Steps
 
