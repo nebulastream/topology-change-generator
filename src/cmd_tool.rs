@@ -1,11 +1,9 @@
-use std::ops::Div;
 use rusqlite::{Connection, named_params, Result};
 use simulation_curator::gtfs;
 use simulation_curator::cell_data;
 use simulation_curator::nes_simulation;
 use simulation_curator::nes_simulation::create_single_fog_layer_topology_from_cell_data;
 use clap::Parser;
-use simulation_curator::gtfs::{parse_duration, PartialBlock};
 
 /// Program to generate topology change events
 #[derive(Parser, Debug)]
@@ -27,9 +25,9 @@ struct Args {
     #[arg(long, default_value = "1")]
     day_of_the_week: String,
 
-    /// The short names of lines for which the schedule needs to be extracted.
-    #[arg(long, default_value = "S41")]
-    line_name: String,
+    /// Comma separated short names of the lines for which the schedule needs to be extracted.
+    #[arg(long, default_value = "S41,S42", num_args(0..), value_delimiter = ',')]
+    line_names: Vec<String>,
 
     /// The time interval in seconds to be represented by a single batch. This parameter allows us to speedup the time to increase the rate of topology changes.
     #[arg(long, default_value_t = 20)]
@@ -86,21 +84,26 @@ fn main() -> Result<()> {
     let start_time = gtfs::parse_duration(&(args.start_time)).unwrap();
     let end_time = gtfs::parse_duration(&(args.end_time)).unwrap();
 
-    // get routes and trips for a specific calender date
-    let mut stmt = db.prepare("SELECT DISTINCT block_id, routes.route_short_name \
+    // Compute concatenated line names
+    let line_names = args.line_names.iter().map(|line_name| format!("'{}'", line_name))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let sql_query = format!("{}{}{}", "SELECT DISTINCT block_id, routes.route_short_name \
                                                   FROM routes, trips, calendar_dates \
                                                   WHERE routes.route_id=trips.route_id \
                                                   AND trips.service_id=calendar_dates.service_id \
-                                                  AND routes.route_short_name in ('S41', 'S42') \
+                                                  AND routes.route_short_name in (", line_names, ") \
                                                   AND trips.block_id NOTNULL
                                                   AND calendar_dates.date=( \
                                                         SELECT min(calendar_dates.date) \
                                                         FROM calendar_dates \
-                                                        WHERE strftime('%w',calendar_dates.date) =:day_of_the_week)")?;
+                                                        WHERE strftime('%w',calendar_dates.date) =:day_of_the_week)");
 
+    println!("SQL {}", sql_query);
+    // get routes and trips for a specific calender date
+    let mut stmt = db.prepare(sql_query.as_str())?;
 
-    // let block_ids = stmt.query_map(named_params! {":line_name": args.line_name, ":day_of_the_week": args.day_of_the_week},
-    //                                |row| { Ok(row.get::<usize, String>(0)) })?;
     let block_ids = stmt.query_map(named_params! {":day_of_the_week": args.day_of_the_week},
                                    |row| { Ok((row.get::<usize, String>(0), row.get::<usize, String>(1))) })?;
 
