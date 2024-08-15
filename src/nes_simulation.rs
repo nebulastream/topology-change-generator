@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::{fs, time};
 use std::ops::Sub;
 use std::time::Duration;
-use geojson::GeoJson;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::cell_data::{MultiTripAndCellData, RadioCell, TripAndCellData};
@@ -49,46 +48,16 @@ pub struct SimulatedReconnects {
 }
 
 impl SimulatedReconnects {
-    ///create a geojson containing the first stop of all trips with the source groups having the
-    /// same color
-    // pub fn to_geojson(trips: &[PartialTrip], trip_to_node: &HashMap<String, u64>, node_to_source: HashMap<u64, u64>) -> GeoJson { let mut features = vec![];
-    //     for trip in trips {
-    //         let node_id = trip_to_node.get(&trip.trip_id).unwrap();
-    //         let source_id = node_to_source.get(node_id).unwrap();
-    //         let mut properties = geojson::JsonObject::new();
-    //         let last_shap_point = trip.shape_points.iter().max_by(|).unwrap();
-    //         properties.insert("marker-color".to_string(), serde_json::Value::String(color.to_string()));
-    //         properties.insert("node id".to_string(), serde_json::Value::Number(serde_json::Number::from(*node_id)));
-    //         properties.insert("source id".to_string(), serde_json::Value::Number(serde_json::Number::from(*source_id)));
-    //         let feature = geojson::Feature {
-    //             bbox: None,
-    //             geometry: Some(geojson::Geometry::new(geojson::Value::Point(vec![stop.lon, stop.lat]))),
-    //             id: None,
-    //             properties: Some(properties),
-    //             foreign_members: None,
-    //         };
-    //         features.push(feature);
-    //     }
-    //     GeoJson::FeatureCollection(geojson::FeatureCollection {
-    //         bbox: None,
-    //         features,
-    //         foreign_members: None,
-    //     })
-    // }
-
-
     ///create a placement of logical sources by grouping the trips of a line into no overlapping
     ///groups of vehicles that directly follow each other on the track
     pub fn source_placement_from_blocks(block_map: &HashMap<String, Vec<TripAndCellData>>, group_size: u16) -> HashMap<String, u64> {
         //create a hashmap to store the mapping from source ids to trip ids
         let mut source_placement = HashMap::new();
-        //todo: do not clone
         println!("Creating source placement");
         let mut i = 0;
         for trips in block_map.values() {
             println!("Processing route {}", trips.first().unwrap().trip.route_id);
             //create a vactor of references to the trips
-            // let mut trip_refs: Vec<&PartialTrip> = trips.iter().collect();
             let mut blocks: Vec<PartialBlock> = trips.iter().map(|x| x.trip.clone()).collect();
             //sort the trips by the start time
             for block in blocks.iter_mut() {
@@ -98,7 +67,6 @@ impl SimulatedReconnects {
 
             //iterate over the trips
             for trip in blocks.iter() {
-                // for (i, trip) in blocks.iter().enumerate() {
                 //get the source id
                 let source_id = i as u64 / group_size as u64;
                 println!("Placing source {} on block {} with index {} of route {}", source_id, trip.block_id, i, trip.route_id);
@@ -113,7 +81,7 @@ impl SimulatedReconnects {
         }
         source_placement
     }
-    pub fn from_topology_and_cell_data(topology: FixedTopology, mut cell_data: MultiTripAndCellData, cell_id_to_node_id: HashMap<(u64, u64), u64>, start_time: Duration, batch_interval: Option<Duration>, batch_gap: Option<Duration>, group_size: Option<u16>) -> (Self, HashMap<String, u64>,  Option<HashMap<u64, Vec<u64>>>) {
+    pub fn from_topology_and_cell_data(topology: FixedTopology, mut cell_data: MultiTripAndCellData, cell_id_to_node_id: HashMap<(u64, u64), u64>, start_time: Duration, batch_interval: Option<Duration>, batch_gap: Option<Duration>, group_size: Option<u16>) -> (Self, HashMap<String, u64>, Option<HashMap<u64, Vec<u64>>>) {
         let mut trip_to_node = HashMap::new();
         let mut initial_parents = vec![];
         let mut topology_update_map = BTreeMap::new();
@@ -121,17 +89,14 @@ impl SimulatedReconnects {
         let _reconnect_count = 0;
         let batch_gap = Some(batch_gap.unwrap_or(Duration::from_secs(0)));
 
-        // cell_data.trips.sort_by(|a, b| a.trip.block_id.cmp(&b.trip.block_id));
-        //todo: sorted trips can contain refs only
+        //todo: use refs instead of cloning
         let mut sorted_trips: Vec<TripAndCellData> = cell_data.trips.clone().into_values().flatten().collect();
         sorted_trips.sort_by(|a, b| a.trip.block_id.cmp(&b.trip.block_id));
 
         let mut source_placement_maps = match group_size {
             Some(group_size) => {
-                // let trip_vec: Vec<PartialBlock> = cell_data.trips.iter().map(|x| x.trip.clone()).collect();
-                // Some((SimulatedReconnects::source_placement_from_blocks(&trip_vec, group_size), HashMap::new()))
                 Some((SimulatedReconnects::source_placement_from_blocks(&cell_data.trips, group_size), HashMap::new()))
-            },
+            }
             None => None,
         };
 
@@ -139,7 +104,6 @@ impl SimulatedReconnects {
             trip_to_node.insert(trip.trip.block_id.clone(), child_id);
             let mut current_batch_interval_start = None;
             let mut current_batch_timestamp = None;
-            // let mut batch_gap = None;
             let mut batched_rem: Option<ISQPEvent> = None;
             let mut batched_add: Option<ISQPEvent> = None;
 
@@ -165,78 +129,71 @@ impl SimulatedReconnects {
                 let cell_id = trip.cell_data.get(&(shape_id, sequence_nr)).unwrap();
                 parent_id = *cell_id_to_node_id.get(cell_id).unwrap();
 
-                // if parent_id != previous_parent_id {
-                    //create topology update
-                    let timestamp = point.time.expect("No time set for shape point").sub(start_time);
+                //create topology update
+                let timestamp = point.time.expect("No time set for shape point").sub(start_time);
 
-                    let add_event = ISQPEvent {
-                        parent_id,
-                        child_id,
-                        action: ISQPEventAction::add,
-                    };
+                let add_event = ISQPEvent {
+                    parent_id,
+                    child_id,
+                    action: ISQPEventAction::add,
+                };
 
-                    let remove_event = ISQPEvent {
+                let remove_event = ISQPEvent {
+                    parent_id: previous_parent_id,
+                    child_id,
+                    action: ISQPEventAction::remove,
+                };
+
+                if let Some(interval) = batch_interval {
+                    if timestamp < current_batch_interval_start.unwrap() + interval {
+                        batched_rem = match batched_rem {
+                            Some(b) => {
+                                Some(b.clone())
+                            }
+                            None => {
+                                Some(remove_event)
+                            }
+                        };
+                        batched_add = Some(add_event);
+                    } else {
+                        //insert batch
+                        if let Some(rem) = batched_rem {
+                            let add = batched_add.expect("Mobile node had an edge removed but no new one added");
+                            if rem.parent_id == add.parent_id {
+                                println!("Mobile node had an edge removed and added to the same parent in the same batch, skipping");
+                            } else {
+                                previous_parent_id = add.parent_id;
+                                let update_at_time = topology_update_map.entry(current_batch_timestamp.unwrap()).or_insert(TopologyUpdate { timestamp: current_batch_timestamp.unwrap(), events: vec![] });
+                                update_at_time.events.push(rem);
+                                update_at_time.events.push(add);
+                            }
+                        }
+
+                        //start new batch
+                        batched_rem = None;
+                        batched_add = None;
+
+                        //increment batch start time until we arrive at the batch containing the current time stamp
+                        while timestamp > current_batch_interval_start.unwrap() + interval {
+                            *current_batch_interval_start.as_mut().unwrap() += interval;
+                            *current_batch_timestamp.as_mut().unwrap() += batch_gap.unwrap();
+                        }
+                    }
+                } else {
+                    let update_at_time = topology_update_map.entry(timestamp).or_insert(TopologyUpdate { timestamp, events: vec![] });
+
+                    update_at_time.events.push(ISQPEvent {
                         parent_id: previous_parent_id,
                         child_id,
                         action: ISQPEventAction::remove,
-                    };
+                    });
 
-                    if let Some(interval) = batch_interval {
-                        if timestamp < current_batch_interval_start.unwrap() + interval {
-                            batched_rem = match batched_rem {
-                                Some(b) => {
-                                    Some(b.clone())
-                                }
-                                None => {
-                                    Some(remove_event)
-                                }
-                            };
-                            batched_add = Some(add_event);
-                        } else {
-                            //insert batch
-                            if let Some(rem) = batched_rem {
-                                let add = batched_add.expect("Mobile node had an edge removed but no new one added");
-                                if rem.parent_id == add.parent_id {
-                                    println!("Mobile node had an edge removed and added to the same parent in the same batch, skipping");
-                                } else {
-                                    previous_parent_id = add.parent_id;
-                                    let update_at_time = topology_update_map.entry(current_batch_timestamp.unwrap()).or_insert(TopologyUpdate { timestamp: current_batch_timestamp.unwrap(), events: vec![] });
-                                    update_at_time.events.push(rem);
-                                    update_at_time.events.push(add);
-                                }
-                            }
-                            
-                            //start new batch
-                            // batched_rem = Some(remove_event);
-                            // batched_add = Some(add_event);
-                            batched_rem = None;
-                            batched_add = None;
-
-                            //increment batch start time until we arrive at the batch containing the current time stamp
-                            while timestamp > current_batch_interval_start.unwrap() + interval {
-                                *current_batch_interval_start.as_mut().unwrap() += interval;
-                                *current_batch_timestamp.as_mut().unwrap() += batch_gap.unwrap();
-                            }
-                        }
-                    } else {
-                        let update_at_time = topology_update_map.entry(timestamp).or_insert(TopologyUpdate { timestamp, events: vec![] });
-
-                        update_at_time.events.push(ISQPEvent {
-                            parent_id: previous_parent_id,
-                            child_id,
-                            action: ISQPEventAction::remove,
-                        });
-
-                        update_at_time.events.push(ISQPEvent {
-                            parent_id,
-                            child_id,
-                            action: ISQPEventAction::add,
-                        });
-                    }
-                // }
-
-
-                // previous_parent_id = parent_id;
+                    update_at_time.events.push(ISQPEvent {
+                        parent_id,
+                        child_id,
+                        action: ISQPEventAction::add,
+                    });
+                }
             }
 
             if let Some(rem) = batched_rem {
@@ -249,9 +206,6 @@ impl SimulatedReconnects {
                 let source_id = trip_to_source.get(&trip.trip.block_id).unwrap();
                 node_to_source.insert(child_id, *source_id);
             }
-
-
-
             child_id += 1;
         }
         let source_mapping = if let Some((_, node_to_source)) = &source_placement_maps {
@@ -266,8 +220,6 @@ impl SimulatedReconnects {
 
 impl FixedTopology {
     pub fn write_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        // let json_string = std::fs::read_to_string(&self.paths.get_fixed_topology_nodes_path())?;
-        // let topology: FixedTopology = serde_json::from_str(json_string.as_str())?;
         let json_string = serde_json::to_string_pretty(self)?;
         Ok(fs::write(path, json_string)?)
     }

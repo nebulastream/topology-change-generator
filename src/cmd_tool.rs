@@ -147,7 +147,6 @@ fn main() -> Result<()> {
 
         //iterate over the trips and print the first stop and the corresponding source group
         for block in partial_blocks {
-            // dbg!(&trip.stops);
             let node_id = trip_to_node.get(&block.block_id).unwrap();
             let source_group = source_groups.get(node_id).unwrap();
             if let Some(first_stop) = block.stops.first() {
