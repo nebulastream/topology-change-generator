@@ -182,17 +182,21 @@ impl SimulatedReconnects {
                 } else {
                     let update_at_time = topology_update_map.entry(timestamp).or_insert(TopologyUpdate { timestamp, events: vec![] });
 
-                    update_at_time.events.push(ISQPEvent {
-                        parent_id: previous_parent_id,
-                        child_id,
-                        action: ISQPEventAction::remove,
-                    });
+                    if previous_parent_id == parent_id {
+                        println!("Mobile node {} had an edge removed and added to parent {} in the same batch, skipping", previous_parent_id, parent_id);
+                    } else {
+                        update_at_time.events.push(ISQPEvent {
+                            parent_id: previous_parent_id,
+                            child_id,
+                            action: ISQPEventAction::remove,
+                        });
 
-                    update_at_time.events.push(ISQPEvent {
-                        parent_id,
-                        child_id,
-                        action: ISQPEventAction::add,
-                    });
+                        update_at_time.events.push(ISQPEvent {
+                            parent_id,
+                            child_id,
+                            action: ISQPEventAction::add,
+                        });
+                    }
                 }
             }
 
