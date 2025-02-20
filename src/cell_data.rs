@@ -1,4 +1,6 @@
 use std::collections::{HashMap};
+use std::ptr::addr_of_mut;
+use std::thread::park_timeout;
 use polars::prelude::*;
 use polars_plan::plans::lit;
 use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
@@ -99,11 +101,15 @@ impl MultiTripAndCellData {
 pub fn get_closest_cells_from_csv(file_path: &str, radio: &str, mcc: u32, mncs: &Vec<u32>, start_time: u64, updated: u64, sample_count: u64, trips: &[PartialBlock]) -> MultiTripAndCellData {
     let mut towers = HashMap::new();
 
+    println!("get shapes");
     // get the shape points from the list of trips
     let shape_points = get_shape_points_from_trips(trips);
+    println!("got shapes");
 
+    println!("get cell");
     //read and filter cell data
     add_cell_data(file_path, radio, mcc, mncs, start_time, updated, sample_count, &shape_points, &mut towers);
+    println!("got cell");
 
     // let mut trips_and_cells = vec![];
     let mut trips_and_cells_map = HashMap::new();
@@ -120,11 +126,13 @@ pub fn get_closest_cells_from_csv(file_path: &str, radio: &str, mcc: u32, mncs: 
            
         trips_and_cells.push(trip_and_cell_data);
     }
+    println!("built trips");
     //find closest cells for each shape point
     MultiTripAndCellData {
         trips: trips_and_cells_map,
         radio_cells: towers,
     }
+
 }
 
 // filter radio tower data by radio type, mcc, location and update time
@@ -169,8 +177,50 @@ impl RadioCell {
 }
 
 pub fn find_towers_in_range(df: DataFrame, shape_points: &Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>) {
+
+    let mut closest_tower:HashMap<(&String,u64), RadioCell> = HashMap::new();
+    let total = shape_points.len();
+    let mut i = 0;
     for point in shape_points {
-        if let Some(closest) = find_closest_tower(&df, point) {
+        i=i+1;
+        println!("Point {} of {}", i, total);
+        let point_id = (&point.shape_id, point.shape_pt_sequence);
+
+        //iterator over the rows
+        let mut optional_closest = None;
+        if closest_tower.contains_key(&point_id){
+            println!("Repeat -----------------------------------------------------");
+            let radio_cell = closest_tower.get(&point_id);
+            let cloned_radio_cell = radio_cell.unwrap().clone();            
+            optional_closest = Some(cloned_radio_cell)
+        }else {
+            let mut min_distance = f64::MAX;
+            println!("Data frame height {}; point.shape_pt_lat {}, point.shape_pt_lon {}", df.height(), point.shape_pt_lat, point.shape_pt_lon);
+            //todo: find more effiient way of iterating
+            // https://users.rust-lang.org/t/using-for-loop-on-a-polars-dataframe/101819
+            for i in 0..df.height() {
+                let lat = df.column("lat").unwrap().f64().unwrap().get(i).unwrap();
+                let lon = df.column("lon").unwrap().f64().unwrap().get(i).unwrap();
+                let id = df.column("cid").unwrap().u64().unwrap().get(i).unwrap();
+                let range = df.column("range").unwrap().f64().unwrap().get(i).unwrap();
+                let mnc = df.column("mnc").unwrap().u64().unwrap().get(i).unwrap();
+                //find the vincenty distance
+                let distance = geo_utils::vincenty_dist_between_coordinates((lat, lon), (point.shape_pt_lat, point.shape_pt_lon));
+                if distance < min_distance {
+                    min_distance = distance;
+                    optional_closest = Some(RadioCell {
+                        lat,
+                        lon,
+                        id,
+                        range,
+                        mnc,
+                    });
+                }
+            }
+        }
+        if optional_closest.is_some() {
+            let closest = optional_closest.unwrap();
+            closest_tower.entry(point_id).or_insert_with(|| closest.clone());
             let tower_identifier = (closest.id, closest.mnc);
             towers.insert(tower_identifier, closest);
         }
@@ -191,9 +241,15 @@ pub fn find_closest_towers(shape_points: &Vec<ShapePoint>, towers: &mut HashMap<
 
 pub fn add_cell_data(file_path: &str, radio: &str, mcc: u32, mncs: &Vec<u32>, start_time: u64, updated: u64, sample_count: u64, shape_points: &Vec<ShapePoint>, towers: &mut HashMap<(u64, u64), RadioCell>) {
     let df = read_cell_data_csv(file_path).unwrap();
+    println!("Read cell data");
     let filtered = filter_cell_data(&df, radio, mcc, &mncs, start_time, updated, sample_count).unwrap();
+    println!("Filter cell tower");
     find_towers_in_range(filtered, shape_points, towers);
+    println!("Find cell tower in range")
 }
+
+
+
 
 fn find_closest_tower_from_map(id_to_cell: &mut HashMap<(u64, u64), RadioCell>, point: &ShapePoint) -> Option<RadioCell> {
     //iterator over the rows
@@ -222,6 +278,7 @@ fn find_closest_tower(df: &DataFrame, point: &ShapePoint) -> Option<RadioCell> {
     //iterator over the rows
     let mut closest = None;
     let mut min_distance = f64::MAX;
+    println!("Data frame height {}; point.shape_pt_lat {}, point.shape_pt_lon {}", df.height(), point.shape_pt_lat, point.shape_pt_lon);
     //todo: find more effiient way of iterating
     // https://users.rust-lang.org/t/using-for-loop-on-a-polars-dataframe/101819
     for i in 0..df.height() {
@@ -243,6 +300,7 @@ fn find_closest_tower(df: &DataFrame, point: &ShapePoint) -> Option<RadioCell> {
             });
         }
     }
+    println!("Finished {}", df.height());
     closest
 }
 

@@ -34,8 +34,8 @@ struct Args {
     batch_interval_size_in_seconds: u64,
 
     /// The frequency at which the batch of topology changes needs to be produced.
-    #[arg(long, default_value_t = 4)]
-    batch_frequency_in_seconds: u64,
+    #[arg(long, default_value_t = 500)]
+    batch_frequency_in_milliseconds: u64,
 
     /// Path to the file where fixed_topology.json will be produced
     #[arg(long, default_value = "fixed_topology.json")]
@@ -134,7 +134,7 @@ fn main() -> Result<()> {
     topology.write_to_file(&(args.topology_path)).unwrap();
 
     let batch_interval = std::time::Duration::from_secs(args.batch_interval_size_in_seconds);
-    let batch_gap = std::time::Duration::from_secs(args.batch_frequency_in_seconds);
+    let batch_gap = std::time::Duration::from_millis(args.batch_frequency_in_milliseconds);
     let (simulated_reconnects, trip_to_node, source_groups) = nes_simulation::SimulatedReconnects::from_topology_and_cell_data(topology, cells, cell_id_to_node_id, start_time, batch_interval.into(), batch_gap.into(), args.source_group_size);
     let events = simulated_reconnects.topology_updates.iter().map(|x| x.events.len()).sum::<usize>();
     println!("Created {} batches containing {} events. Last batch will be emitted after {}s", simulated_reconnects.topology_updates.len(), events, simulated_reconnects.topology_updates.last().unwrap().timestamp.as_secs());

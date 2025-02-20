@@ -60,9 +60,9 @@ However, all affected queries are processed concurrently.
 
 Run the command to build the project `cargo build --release`.
 
-Run the following command to generate topology changes with default configurations `target\release\cmad_tool`.
+Run the following command to generate topology changes with default configurations `target/release/cmd_tool`.
 
-Run the following command to know all command line options `target\release\cmad_tool --help`.
+Run the following command to know all command line options `target/release/cmd_tool --help`.
 
 # Parameters
 
@@ -80,7 +80,7 @@ end_time                      : The time of the day until when the schedule need
 day_of_the_week               : The day of the week (in number) for which the schedule needs to be selected. The week starts with 0 for Sunday and ends at 6 for Saturday.
 line_name                     : Name of the train line 
 batch_interval_size_in_seconds: The time interval in seconds to be represented by a single batch. This parameter allows us to speedup the time to increase the rate of topology changes.
-batch_frequency_in_seconds    : The frequency at which the batch of topology changes needs to be produced.
+batch_frequency_in_milliseconds: The frequency at which the batch of topology changes needs to be produced.
 ```
 
 ### Parameters to store output files
