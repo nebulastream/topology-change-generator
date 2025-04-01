@@ -2,6 +2,7 @@ use serde_with::DurationMilliSeconds;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::{fs, time};
 use std::time::Duration;
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -270,17 +271,38 @@ mod tests {
     }
 }
 
+/// Program to generate synthetic topology change events
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Output path for the generated files
+    #[arg(short, long, default_value = ".")]
+    output_path: String,
+
+    /// Number of fog nodes in the generated topology
+    #[arg(short, long, default_value_t = 10)]
+    fog_nodes: u64,
+
+    /// Number of mobile devices to be created for each fog node
+    #[arg(short, long, default_value_t = 10)]
+    mobile_devices_per_fog_node: u64,
+
+    /// Number of moving devices per topology update
+    #[arg(long, default_value_t = 1)]
+    moving_devices: u16,
+}
+
 fn main() {
-    //get output path from cmd line
-    let args: Vec<String> = std::env::args().collect();
-    let output_path = &args[1];
-    let quadrants = 10;
+    let args = Args::parse();
+    
+    let output_path = args.output_path;
+    let quadrants = args.fog_nodes;
     let quadrant_start_id = 2;
-    let mobile_devices_per_quadrant = 8;
-    let num_of_devices_to_rotate = 2;
+    let mobile_devices_per_quadrant = args.mobile_devices_per_fog_node;
+    let num_of_devices_to_rotate = args.moving_devices;
     let mdq = MobileDeviceQuadrants::populate(
-        quadrants,
-        mobile_devices_per_quadrant,
+        quadrants as usize,
+        mobile_devices_per_quadrant as usize,
         quadrant_start_id,
         (quadrants) as u64 + quadrant_start_id
     );
