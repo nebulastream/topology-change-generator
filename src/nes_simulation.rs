@@ -10,7 +10,6 @@ use crate::gtfs::{parse_duration, PartialBlock, Stop};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FixedTopology {
-    //todo: check if we can just make that a tuple
     pub nodes: HashMap<u64, Vec<f64>>,
     pub slots: HashMap<u64, u16>,
     pub children: HashMap<u64, Vec<u64>>,

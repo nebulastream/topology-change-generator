@@ -19,3 +19,7 @@ clap = { version = "4.5.13", features = ["derive"] }
 [[bin]]
 name = "cmd_tool"
 path = "src/cmd_tool.rs"
+
+[[bin]]
+name = "synthetic_topology_change_generator"
+path = "src/synthetic_topology_change_generator.rs"
