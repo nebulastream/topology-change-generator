@@ -1,5 +1,5 @@
 # TopologyChangeGenerator
-This repository contains code to produce a collection of topology changes based on the [OpenCelliD](https://opencellid.org/) database and GTFS schedule of [VBB](https://www.vbb.de/vbb-services/api-open-data/datensaetze/). This generator is used to investigate the effect of mobile infrastructure on the runtime performance of NebulaStream. This work was used in our ICDE 2025 work ![Incremental Stream Query Placement in Massively Distributed and Volatile Infrastructure (Pre-Print)](https://web.iitd.ac.in/~kbeedkar/publication/isqp-icde-25/isqp-icde25.pdf).
+This repository contains code to produce a collection of topology changes based on the [OpenCelliD](https://opencellid.org/) database and GTFS schedule of [VBB](https://www.vbb.de/vbb-services/api-open-data/datensaetze/). This generator is used to investigate the effect of mobile infrastructure on the runtime performance of NebulaStream. This work was used in our ICDE 2025 work [Incremental Stream Query Placement in Massively Distributed and Volatile Infrastructure (Pre-Print)](https://web.iitd.ac.in/~kbeedkar/publication/isqp-icde-25/isqp-icde25.pdf).
 
 ```
 @INPROCEEDINGS{chaudharyISQP25,
