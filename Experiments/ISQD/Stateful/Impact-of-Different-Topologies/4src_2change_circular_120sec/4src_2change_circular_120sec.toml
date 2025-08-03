@@ -1,14 +1,11 @@
 enable_query_reconfiguration = [true, false]
-enable_proactive_deployment = [false]
 tuples_per_buffer = [1]
 gathering_interval = [10]
 speedup_factor = [2]
 placementAmendmentThreadCount = [8, 1]
 
 [default_config.parameters]
-query_duplication_factor = 0
 placementAmendmentThreadCount = 8
-reconnect_start_offset = 40
 amount_of_reconnects = 10
 speedup_factor = 1.0
 deployment_time_offset = 160
@@ -17,7 +14,6 @@ reconnect_runtime = 120
 cooldown_time = 10
 post_cooldown_time = 60
 enable_query_reconfiguration = true
-enable_proactive_deployment = true
 reconnect_input_type = "LIVE"
 source_input_server_port = 9999
 join_match_interval = 7
