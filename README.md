@@ -20,6 +20,12 @@ Environments](https://vbn.aau.dk/ws/portalfiles/portal/515412211/p1753_li.pdf).
 
 We use the tool's data to evaluate the time it takes for NebulaStream to reconfigure the running plans consuming data from mobile devices (trains).
 
+## Experiment Data Set
+
+This repository contains the following experiment data set:
+- **[ISQD](Experiments/ISQD)**: this folder contains configurations for the experiments conducted for our next publication "Incremental Stream Query Deployment". 
+
+
 ## The case of Ring-Bahn
 
 We use the topology change generator to produce trajectory of Berlin S41 and S42 line that runs on a circular track in opposite directions. 
